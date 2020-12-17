@@ -1,0 +1,193 @@
+---
+title: "Spectrum_for_MCMC"
+author: "Montana McLeod"
+date: "12/8/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd("~/Box Sync/McLeod_thesis/code")
+DOdata <- read.delim("~/Box Sync/McLeod_thesis/Data/DO_Data.txt", comment.char="#")
+library(tidyverse)
+library(pracma)
+require(stats)
+require(splines)
+```
+
+# Data Wrangling
+```{r echo=FALSE}
+# DO less than hypoxic threshold & 150 julian date cut off
+data <- as_tibble(DOdata)
+Low_hypox <- data %>%
+  filter(time >= 150) %>% 
+  filter(DO <= 1.43) %>%
+  group_by(year) %>%
+  summarise(LowDO = n())
+#summarise(DO= mean(DO), TotalDO = n())
+
+#total hypoxia values w/ 150 julian date cut off
+High_Hypox <- data %>%
+  group_by(year) %>%
+  filter(time >= 150) %>% 
+  summarise(TotalDO = n())
+
+#merged data
+hypox <- merge(Low_hypox, High_Hypox, by="year", all=TRUE)
+
+#reorder based on proportion of low DO events
+hypox <- hypox %>% 
+  mutate(Prop = LowDO/TotalDO)
+ord<- order(hypox$Prop, decreasing = T)
+hypox <- hypox[ord,]
+#hypoxic years: 2020, 2018
+#non-hypoxic years: 2015, 2010
+
+#plot good/bad hyopxic years
+par(mfrow=c(1,2))
+plot(DO~time, data= DOdata[DOdata$year == 2015,], col= "blue", type='l')
+abline(h=1.43)
+plot(DO~time, data= DOdata[DOdata$year == 2018,], col= "red", type='l')
+abline(h=1.43)
+```
+
+
+# Plots after interpolation
+```{r}
+# aggregated across Julian day and subset by year
+interp_df <- NULL
+yrs <- seq(2010, 2020, by=1)
+for (i in 1:length(yrs)) 
+
+missing.DO <- function(data){  
+  x <- data %>% 
+    filter(time >= 150) %>% 
+    mutate(Jday = round(time, digits=1))
+    
+    xx <- x %>% 
+      group_by(year) %>% 
+      summarise(Tot.days = max(Jday))
+    
+   y <- x %>% 
+     group_by(year, Jday) %>%  
+    summarise(DO= mean(DO), year= max(year))
+  
+  y <- spread(y, Jday, DO, fill = NA)
+  
+  z <-pivot_longer(y, cols=c('150':'263.2'), names_to = "Jday", values_to = "DO")
+  z <- inner_join(z, xx, by = 'year')
+  
+  zz <- z %>% 
+    group_by(year, Jday) %>% 
+    filter(Jday <= max(Tot.days)) %>% 
+    ungroup()
+  
+  return(zz)
+  }
+dat_NA <- missing.DO(DOdata)
+
+
+intrp.DO <- function(dat, yr){
+  dat <- dat %>% 
+    filter(year == yrs[i])
+  #x <- as.data.frame(dat[is.na(dat$DO),])
+  
+  intrp <-loess(DO ~ Jday, dat, span= 0.2, control = loess.control(surface = "direct")) #interpolates
+  Unif_t <- seq(min(dat$Jday), max(dat$Jday), by = 0.1) #creates the sequence of julian days we want
+
+  y <- predict(intrp, data.frame(Jday = Unif_t), se=F) #predicts the missing values of DO
+  
+    z <- data.frame(Jday = Unif_t, DO =  y)
+    zz <- inner_join(z, x, by = c('Jday', 'DO'))
+  dat$Year <- rep(yr, nrow(dat))
+  dat <- dat[ ,c(3,1:2)]
+  colnames(dat) <- c("Year", "Jday", "DO")
+  return(dat)
+}
+  
+  table(diff(interp_df$Jday)) 
+  
+  ggplot(interp_df, aes(Jday, DO, color=year))+
+  geom_line()+
+  scale_fill_brewer(palette = "Accent")+
+  facet_wrap(~year, 4)+
+  geom_hline(yintercept = 1.43, color= "red")
+  
+```
+
+
+# using the interpolated results
+```{r}
+
+spec.yr <- function(dat, yr){
+  dat <- subset(dat, year == yr)
+  z = dat
+# make X into a timeseries object
+  z$Jday <- as.ordered(as.numeric(z$Jday))
+  
+Dt <- ts(data=z$DO, start = c(min(z$Jday), 1), frequency = 10) # note that this assumes sequential evenly-spaced sampling. If that is not the case we have to do some padding...
+Dt <- na.fill(Dt, "extend")
+
+#Dt <- ts_c(dat)  
+# scale to unit variance
+Dt <- Dt/sd(Dt, na.rm=TRUE)
+
+# detrend
+Time = seq(min(dat$Jday), max(dat$Jday), by=0.1)
+m <- lm(Dt ~ Time)
+Dt2 = m$resid
+Dt2 = Dt2/sd(Dt2) # rescale to unit variance
+
+# Now do the FFT
+f <- seq(from=0, to=0.5, length.out = ceiling(length(Dt2) / 2)) # vector of frequencies
+Freq <- abs((fft(Dt2) ) ) / length(Dt2)
+Freq = Freq[1:length(f)]
+
+# make into dataframe for ggplot
+DsD <-  data.frame(x=1/f, y= Freq^2) 
+DsD <- cbind(rep(yr, nrow(DsD)), DsD)
+return(DsD)
+}
+
+DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
+colnames(DsD) <- c("Year", "Period", "Freq_sq")
+
+ggplot(DsD,aes(Period, Freq_sq, color=Year))+
+  geom_line()+
+  facet_wrap(~Year)
+
+
+# Simulating new datasets based on the FFT
+
+# We do this by randomizing the phase (imaginary part) of the FFT spectrum
+Theta <- runif(n=length(f)) * 2 * pi # 2pi converts to radians
+# Now do inverse FFT with modulus (real part) of original FFT but randomized phase
+Z = Re(fft(Dt2[1:length(f)])) * exp(1i*Theta) #DIFFERENT LENTHS BUT TOOK FIRST 6 LIKE ON LINE 28
+ZZ = Re(ifft(Z))
+# repeat as many times as you like...
+plot(ZZ, type='l')
+
+```
+
+
+```{r}
+# get ar scale
+Dt.ar <- ar(Dt2, na.action=na.pass)
+Dt.ar #1.0398
+
+
+# Red noise significance cutoff (based on Torrence & Compo 1998)
+lag1  = 0.99  # Get this value from the ar() operation above #coefficient correlation btw successive pts
+fft_theor <- (1 - lag1^2) / (1 - 2 * lag1 * cos(f*2*pi) + lag1^2) #eqn 16 w/in cos() should have / length(f) # No - f is already equal to k/N in their notation
+fft_theor <- var(Dt2, na.rm=TRUE) * fft_theor / (2 * length(f)) #rescaling for unit variance?
+chi2 = qchisq(0.05, 2, lower.tail=FALSE) / 2
+signif = chi2*fft_theor
+
+good_yr$signif = signif
+
+ggplot(good_yr, aes(Period, Freq_sq))+
+  geom_line()+
+  geom_line(aes(Period, signif, color= "red"))
+
+```
