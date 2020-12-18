@@ -14,6 +14,7 @@ library(tidyverse)
 library(pracma)
 require(stats)
 require(splines)
+require(zoo)
 ```
 
 # Data Wrangling
@@ -56,28 +57,32 @@ abline(h=1.43)
 # Plots after interpolation
 ```{r}
 # aggregated across Julian day and subset by year
-interp_df <- NULL
-yrs <- seq(2010, 2020, by=1)
-for (i in 1:length(yrs)) 
+# yrs <- seq(2010, 2020, by=1)
 
 missing.DO <- function(data){  
+  #start time in late May
   x <- data %>% 
     filter(time >= 150) %>% 
     mutate(Jday = round(time, digits=1))
-    
+  
+  # factoring in total days per sample period to reformat df
     xx <- x %>% 
       group_by(year) %>% 
       summarise(Tot.days = max(Jday))
-    
+   
+  # shortening time frame as 10 pts / julian day  
    y <- x %>% 
      group_by(year, Jday) %>%  
     summarise(DO= mean(DO), year= max(year))
   
+  # accounts for missing values in dataset 
   y <- spread(y, Jday, DO, fill = NA)
-  
+  # establishes set time frame that can later be limited by annual sample period
   z <-pivot_longer(y, cols=c('150':'263.2'), names_to = "Jday", values_to = "DO")
+  z$Jday <- as.numeric(z$Jday)
   z <- inner_join(z, xx, by = 'year')
   
+  # removes values that were more than total days in a sample period 
   zz <- z %>% 
     group_by(year, Jday) %>% 
     filter(Jday <= max(Tot.days)) %>% 
@@ -88,27 +93,27 @@ missing.DO <- function(data){
 dat_NA <- missing.DO(DOdata)
 
 
-intrp.DO <- function(dat, yr){
-  dat <- dat %>% 
-    filter(year == yrs[i])
+#intrp.DO <- function(dat, yr){
+ # dat <- dat %>% 
+    #filter(year == yrs[i])
   #x <- as.data.frame(dat[is.na(dat$DO),])
   
-  intrp <-loess(DO ~ Jday, dat, span= 0.2, control = loess.control(surface = "direct")) #interpolates
-  Unif_t <- seq(min(dat$Jday), max(dat$Jday), by = 0.1) #creates the sequence of julian days we want
+  #intrp <-loess(DO ~ Jday, dat, span= 0.2, control = loess.control(surface = "direct")) #interpolates
+  #Unif_t <- seq(min(dat$Jday), max(dat$Jday), by = 0.1) #creates the sequence of julian days we want
 
-  y <- predict(intrp, data.frame(Jday = Unif_t), se=F) #predicts the missing values of DO
+#  y <- predict(intrp, data.frame(Jday = Unif_t), se=F) #predicts the missing values of DO
   
-    z <- data.frame(Jday = Unif_t, DO =  y)
-    zz <- inner_join(z, x, by = c('Jday', 'DO'))
-  dat$Year <- rep(yr, nrow(dat))
-  dat <- dat[ ,c(3,1:2)]
-  colnames(dat) <- c("Year", "Jday", "DO")
-  return(dat)
-}
+ #   z <- data.frame(Jday = Unif_t, DO =  y)
+  #  zz <- inner_join(z, x, by = c('Jday', 'DO'))
+  #dat$Year <- rep(yr, nrow(dat))
+  # dat <- dat[ ,c(3,1:2)]
+  # colnames(dat) <- c("Year", "Jday", "DO")
+  #return(dat)
+#}
   
-  table(diff(interp_df$Jday)) 
+  #table(diff(interp_df$Jday)) 
   
-  ggplot(interp_df, aes(Jday, DO, color=year))+
+  ggplot(dat_NA, aes(Jday, DO, color=year))+
   geom_line()+
   scale_fill_brewer(palette = "Accent")+
   facet_wrap(~year, 4)+
@@ -147,38 +152,40 @@ Freq = Freq[1:length(f)]
 # make into dataframe for ggplot
 DsD <-  data.frame(x=1/f, y= Freq^2) 
 DsD <- cbind(rep(yr, nrow(DsD)), DsD)
-return(DsD)
-}
-
-DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
-colnames(DsD) <- c("Year", "Period", "Freq_sq")
-
-ggplot(DsD,aes(Period, Freq_sq, color=Year))+
-  geom_line()+
-  facet_wrap(~Year)
-
 
 # Simulating new datasets based on the FFT
 
 # We do this by randomizing the phase (imaginary part) of the FFT spectrum
 Theta <- runif(n=length(f)) * 2 * pi # 2pi converts to radians
 # Now do inverse FFT with modulus (real part) of original FFT but randomized phase
-Z = Re(fft(Dt2[1:length(f)])) * exp(1i*Theta) #DIFFERENT LENTHS BUT TOOK FIRST 6 LIKE ON LINE 28
+Z = Re(fft(Dt2[1:length(f)])) * exp(1i*Theta) 
 ZZ = Re(ifft(Z))
-# repeat as many times as you like...
-plot(ZZ, type='l')
+DsD$Sim_DO <- ZZ
 
+return(DsD)
+}
+
+DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
+colnames(DsD) <- c("Year", "Period", "Freq_sq", "Sim_DO")
+
+ggplot(DsD,aes(Period, Freq_sq, color=Year))+
+  geom_line()+
+  facet_wrap(~Year)
+
+# repeat as many times as you like...
+plot(DsD[DsD$Year == 2015, 4], type='l')
+
+save(DsD, file= "DO_sims.Rdata")
 ```
 
-
+# red noise 
 ```{r}
 # get ar scale
 Dt.ar <- ar(Dt2, na.action=na.pass)
 Dt.ar #1.0398
 
-
 # Red noise significance cutoff (based on Torrence & Compo 1998)
-lag1  = 0.99  # Get this value from the ar() operation above #coefficient correlation btw successive pts
+lag1  = 0.8868  # Get this value from the ar() operation above #coefficient correlation btw successive pts
 fft_theor <- (1 - lag1^2) / (1 - 2 * lag1 * cos(f*2*pi) + lag1^2) #eqn 16 w/in cos() should have / length(f) # No - f is already equal to k/N in their notation
 fft_theor <- var(Dt2, na.rm=TRUE) * fft_theor / (2 * length(f)) #rescaling for unit variance?
 chi2 = qchisq(0.05, 2, lower.tail=FALSE) / 2
