@@ -149,8 +149,21 @@ f <- seq(from=0, to=0.5, length.out = ceiling(length(Dt2) / 2)) # vector of freq
 Freq <- abs((fft(Dt2) ) ) / length(Dt2)
 Freq = Freq[1:length(f)]
 
+
+### Red noise significance cutoff (based on Torrence & Compo 1998)
+# get ar scale
+Dt.ar <- ar(Dt2, na.action=na.pass)
+Dt.ar #1.0398
+lag1 = Dt.ar[[2]][1]  # Get this value from the ar() operation above #coefficient correlation btw successive pts
+fft_theor <- (1 - lag1^2) / (1 - 2 * lag1 * cos(f*2*pi) + lag1^2) #eqn 16 w/in cos() should have / length(f) # No - f is already equal to k/N in their notation
+fft_theor <- var(Dt2, na.rm=TRUE) * fft_theor / (2 * length(f)) #rescaling for unit variance?
+chi2 = qchisq(0.05, 2, lower.tail=FALSE) / 2
+signif = chi2*fft_theor
+
 # make into dataframe for ggplot
-DsD <-  data.frame(x=1/f, y= Freq^2) 
+DsD <-  data.frame(Period = 1/f, 
+                   Freq_sq = Freq^2,
+                   Signf = signif) 
 DsD <- cbind(rep(yr, nrow(DsD)), DsD)
 
 # Simulating new datasets based on the FFT
@@ -166,26 +179,30 @@ return(DsD)
 }
 
 DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
-colnames(DsD) <- c("Year", "Period", "Freq_sq", "Sim_DO")
+colnames(DsD) <- c("Year", "Period", "Freq_sq", "Signf", "Sim_DO")
+save(DsD, file= "DO_sims.Rdata")
 
 ggplot(DsD,aes(Period, Freq_sq, color=Year))+
   geom_line()+
   facet_wrap(~Year)
 
-# repeat as many times as you like...
-plot(DsD[DsD$Year == 2015, 4], type='l')
-
-save(DsD, file= "DO_sims.Rdata")
+ggplot(DsD, aes(Period, Freq_sq))+
+  geom_line()+
+  geom_line(aes(Period, Signf, color= "red"))+
+  facet_wrap(~Year)
 ```
 
-# red noise 
+
+
+## Added to the Spec.yr() fxn
+
 ```{r}
 # get ar scale
 Dt.ar <- ar(Dt2, na.action=na.pass)
 Dt.ar #1.0398
 
 # Red noise significance cutoff (based on Torrence & Compo 1998)
-lag1  = 0.8868  # Get this value from the ar() operation above #coefficient correlation btw successive pts
+lag1 = Dt.ar[[2]][1]  # Get this value from the ar() operation above #coefficient correlation btw successive pts
 fft_theor <- (1 - lag1^2) / (1 - 2 * lag1 * cos(f*2*pi) + lag1^2) #eqn 16 w/in cos() should have / length(f) # No - f is already equal to k/N in their notation
 fft_theor <- var(Dt2, na.rm=TRUE) * fft_theor / (2 * length(f)) #rescaling for unit variance?
 chi2 = qchisq(0.05, 2, lower.tail=FALSE) / 2
@@ -193,8 +210,9 @@ signif = chi2*fft_theor
 
 good_yr$signif = signif
 
-ggplot(good_yr, aes(Period, Freq_sq))+
+ggplot(DsD, aes(Period, Freq_sq))+
   geom_line()+
-  geom_line(aes(Period, signif, color= "red"))
+  geom_line(aes(Period, Signf, color= "red"))+
+  facet_wrap(~Year)
 
 ```
