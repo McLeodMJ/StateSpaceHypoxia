@@ -136,11 +136,11 @@ Dt <- na.fill(Dt, "extend")
 
 #Dt <- ts_c(dat)  
 # scale to unit variance
-Dt <- Dt/sd(Dt, na.rm=TRUE)
+Dt_new <- Dt/sd(Dt, na.rm=TRUE)
 
 # detrend
 Time = seq(min(dat$Jday), max(dat$Jday), by=0.1)
-m <- lm(Dt ~ Time)
+m <- lm(Dt_new ~ Time)
 Dt2 = m$resid
 Dt2 = Dt2/sd(Dt2) # rescale to unit variance
 
@@ -173,18 +173,24 @@ Theta <- runif(n=length(f)) * 2 * pi # 2pi converts to radians
 # Now do inverse FFT with modulus (real part) of original FFT but randomized phase
 Z = Re(fft(Dt2[1:length(f)])) * exp(1i*Theta) 
 ZZ = Re(ifft(Z))
+ZZ = ZZ * sd(Dt) + mean(Dt)
 DsD$Sim_DO <- ZZ
 
+# make negative simDO - 0
+DsD[DsD$Sim_DO <= 0, 5] <- 0
 return(DsD)
 }
 
 DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
 colnames(DsD) <- c("Year", "Period", "Freq_sq", "Signf", "Sim_DO")
 save(DsD, file= "DO_sims.Rdata")
+# divide x by 10 -x axis by days
 
-ggplot(DsD,aes(Period, Freq_sq, color=Year))+
+
+ggplot(DsD, aes(x=Period, Freq_sq, color=Year))+
   geom_line()+
-  facet_wrap(~Year)
+  facet_wrap(~Year)+
+  #scale_x_continuous(Period / 10) #want to rescale the x axis to be by day
 
 ggplot(DsD, aes(Period, Freq_sq))+
   geom_line()+
