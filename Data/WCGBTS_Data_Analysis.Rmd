@@ -1,0 +1,143 @@
+---
+title: "WCGBTS_Data_Analysis"
+author: "Montana McLeod"
+date: "7/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(viridis)
+library(dplyr)
+library(lubridate)
+```
+
+
+# Raw Data
+```{r}
+setwd("~/Documents/THESIS/Code")
+sp_data <- read.csv("Species.csv", stringsAsFactors = FALSE) #ALL data btw 2009-2019 of ALL species
+  sp_data <- sp_data[ ,c(3:8,16:17,20)] # only the important variables
+  sp_data$year <- as.numeric(sp_data$year)
+  sp_data <- sp_data[order(sp_data$year), ] # order the data set by Year
+ 
+haul_data <- read.csv("Haul.csv", stringsAsFactors = FALSE)
+  haul_data <- haul_data[ ,c(1:5,9:11)]
+  haul_data <- haul_data[order(haul_data$year), ]
+  colnames(haul_data)[colnames(haul_data) == "date_yyyymmdd"] <- "Date" #change name of date
+  
+Total_sp_data <- merge(sp_data, haul_data, by = c("trawl_id", "year",  "latitude_dd", "longitude_dd", "depth_m"), all = TRUE)  # merge data to be both datasets
+Total_sp_data$Date <- as.Date(as.character(Total_sp_data$Date), format="%Y%m%d") #FORMAT DATE 
+
+Total_sp_data <- Total_sp_data %>% 
+  mutate(Month = factor(
+    month(Date, label = FALSE),   # thing you're converting
+    1:12,                                  # values it could take
+    labels =                               # how they should appear
+      c("January", "February", "March", "April",
+      "May", "June", "July", "August",
+      "September", "October", "November", "December"),
+    ordered = TRUE)) #Sets the Month to automatically order via month order [lubridate package]
+
+Total_sp_data <- Total_sp_data[ , c(1,10,13,2:5,9,6:8,11:12)] #reorganize 
+```
+
+
+# Datasets by species
+```{r}
+#GREENSTRIPED ROCKFISH
+Grock <- subset(Total_sp_data, common_name == "greenstriped rockfish", select = c(trawl_id : depth_m, common_name : temperature_at_gear_c_der) )[ , c(8, 1:7, 9:12)]
+table(Total_sp_data$common_name) #check no. of datapoints match with new DF
+
+#YELLOWTAIL ROCKFISH
+Yrock <- subset(Total_sp_data, common_name == "yellowtail rockfish", select = c(trawl_id : depth_m, common_name : temperature_at_gear_c_der) )[ , c(8, 1:7, 9:12)]
+
+#LINGCOD
+Lingcod <- subset(Total_sp_data, common_name == "lingcod", select = c(trawl_id : depth_m, common_name : temperature_at_gear_c_der) )[ , c(8, 1:7, 9:12)]
+rand <- sample(na.omit(Lingcod$o2_at_gear_ml_per_l_der), n, replace = FALSE) #creates a random sample to use for simulations 
+save(list = "rand", file= "Random_hypoxia.Rdata")
+
+#DOVER SOLE
+Dsole <- subset(Total_sp_data, common_name == "Dover sole", select = c(trawl_id : depth_m, common_name : temperature_at_gear_c_der) )[ , c(8, 1:7, 9:12)]
+
+save(list= c("Grock", "Yrock", "Lingcod", "Dsole") ,file= "Groundfish.Hyp.Rdata")
+```
+
+
+# Greenstriped rockfish Distributions
+```{r}
+ ggplot(Grock, aes(x=Month_no, fill=length_cm))+
+    geom_histogram(binwidth= 0.5)+
+   facet_wrap(~sort(year)) 
+summary(Grock)
+
+#adding a column that classifies hypoxia 
+Grock$Hypoxia <- ifelse(Grock$o2_at_gear_ml_per_l_der <= 0.504, "severe_hypoxia",
+                      ifelse(Grock$o2_at_gear_ml_per_l_der > 0.5 & Grock$o2_at_gear_ml_per_l_der                        <=  1.43,"hypoxic", 
+                        ifelse(Grock$o2_at_gear_ml_per_l_der > 1.43, "non-hypoxic", NA) ) )
+
+ggplot(Grock, aes(Month_no, o2_at_gear_ml_per_l_der)) +
+  geom_point(aes(color = Hypoxia)) +
+  facet_wrap(~sort(year))
+
+```
+
+
+# Yellowtail rockfish Distributions 
+```{r}
+ ggplot(Yrock, aes(x=Month_no, fill=length_cm))+
+    geom_histogram(binwidth= 0.5)+
+   facet_wrap(~sort(year)) 
+summary(Yrock)
+
+#adding a column that classifies hypoxia 
+Yrock$Hypoxia <- ifelse(Yrock$o2_at_gear_ml_per_l_der <= 0.504, "severe_hypoxia",
+                      ifelse(Yrock$o2_at_gear_ml_per_l_der > 0.5 & Yrock$o2_at_gear_ml_per_l_der                        <=  1.43,"hypoxic", 
+                        ifelse(Yrock$o2_at_gear_ml_per_l_der > 1.43, "non-hypoxic", NA) ) )
+
+ggplot(Yrock, aes(Month_no, o2_at_gear_ml_per_l_der)) +
+  geom_point(aes(color = Hypoxia)) +
+  facet_wrap(~sort(year))
+```
+
+
+# Lingcod Distributions
+```{r}
+ ggplot(Lingcod, aes(x=Month_no, fill=length_cm))+
+    geom_histogram(binwidth= 0.5)+
+   facet_wrap(~sort(year)) 
+summary(Lingcod)
+
+#adding a column that classifies hypoxia 
+Lingcod$Hypoxia <- ifelse(Lingcod$o2_at_gear_ml_per_l_der <= 0.5, "severe_hypoxia",
+                      ifelse(Lingcod$o2_at_gear_ml_per_l_der > 0.5 & Lingcod$o2_at_gear_ml_per_l_der                        <=  1.43,"hypoxic", 
+                        ifelse(Lingcod$o2_at_gear_ml_per_l_der > 1.43, "non-hypoxic", NA) ) )
+
+ggplot(Lingcod, aes(Month_no, o2_at_gear_ml_per_l_der)) +
+  geom_point(aes(color = Hypoxia)) +
+  facet_wrap(~sort(year))
+```
+
+
+# Dover sole Distributions
+```{r}
+ ggplot(Dsole, aes(x=Month_no, fill=length_cm))+
+    geom_histogram(binwidth= 0.5)+
+   facet_wrap(~sort(year)) 
+summary(Dsole)
+
+#adding a column that classifies hypoxia 
+Dsole$Hypoxia <- ifelse(Dsole$o2_at_gear_ml_per_l_der <= 0.5, "severe_hypoxia",
+                      ifelse(Dsole$o2_at_gear_ml_per_l_der > 0.5 & Dsole$o2_at_gear_ml_per_l_der                        <=  1.43,"hypoxic", 
+                        ifelse(Dsole$o2_at_gear_ml_per_l_der > 1.43, "non-hypoxic", NA) ) )
+
+ggplot(Dsole, aes(Month_no, o2_at_gear_ml_per_l_der)) +
+  geom_point(aes(color = Hypoxia)) +
+  facet_wrap(~sort(year))
+```
+
+
