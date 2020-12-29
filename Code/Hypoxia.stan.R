@@ -1,30 +1,25 @@
 # Hypoxia STAN Model
 
-##########################################
+################################################################################################################################ 
 #psi = prob. space is occupied by thst sp.
 #p1 = prob. of detection w/ covariate
 #hypox.p = variation around hypoxia
 ##########################################
-setwd("~/Documents/THESIS/StateSpaceHypoxia/Code")
+setwd("~/Box Sync/McLeod_thesis/code")
 library(rstan)
+library(bayesplot)
+library(shinystan)
+library('dplR')
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-load("../Data/Random_hypoxia.Rdata") #remove /.Data/
 
 
-# Generate a random simulation 
-n= 1000 #no. of simulations  
-sim <- data.frame( trawl = seq(1, n, by=1), 
-                   pres = rep(NA, n), 
-                   hypox = rand) #pulls a random sample from WCGBTS - Needs to be improved to incorperate a fourier trans.
+############################################## Simulated Data ######################################################
+load("DO_sims.Rdata")
 
-#Severe hypoxia as logistic regression w/ 0.965 as midpoint of hypoxia 
-sim$p <- 1/ (1+exp(-(sim$hypox - 0.965)))
-plot(p~hypox, sim )
-
-sim$pres <- rbinom(nrow(sim), 1, sim$p) #random presence/absence
-
-# Functions for transformations
+good_yr <- DsD[DsD$Year == 2015,5]
+bad_yr <- DsD[DsD$Year == 2018,5]
+############################################ Functions for transformations ##########################################
 logit <- function(x){
   log(x/(1-x))
 }
@@ -32,72 +27,100 @@ inv_logit <- function(x){
   exp(x)/(exp(x)+1)
 }
 
-# Initial variables 
-N = 1000
-psi = 0.5
-hypox = sim$hypox 
-p = 0.2
-hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn 
 
-# factoring in hypoxia as a covariate 
-p.full <- inv_logit(logit(p) + hypox.p * hypox)
+############################################  Initial variables # OK NOW NEW VALUES FOR THESE THINGS? ######################
+N = length(good_yr)
+psi = 0.5 #occ.
+p = 0.2 #det.
+hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn but 1+ works
+
+par_gs <- c(psi, p, hypox.p)
+
+
+############################################ factoring in hypoxia as a covariate ############################################ 
+psi.full <- inv_logit(logit(psi) + hypox.p * good_yr)
+## Why inverset then logit fxn?
 # encounters [0 or 1]
-enc <- rbinom(N,1,0.5) * rbinom(N, 1, p.full)
+enc <- rbinom(N, 1, psi.full) * rbinom(N, 1, p)
 
 
-### STAN MODEL
+###############################################  STAN MODEL  ############################################ 
 occ.mod <- "
 data{
 	int<lower=1> N; //number of samples
 	int<lower=0> enc[N]; //encounters
 	vector[N] hypox; //hypoxia
+	vector[3] par_gs; // parameter priors
+	real<lower=0> cv_guess;
 }
 parameters{
-	real logit_psi; //logit occupancy
-	real logit_p; //logit detection
+  real<lower=0, upper=1> psi;
+	real<lower=0, upper=1> p;
 	real hypox_p; //hypoxia slope
 }
 transformed parameters{
-	real<lower=0, upper=1> psi;
-	real<lower=0, upper=1> p;
-
-	psi = inv_logit(logit_psi);
-	p = inv_logit(logit_p);
+	real logit_psi;
+	real logit_p;
+	
+	logit_psi = logit(psi);
+	logit_p = logit(p);
+	
 }
 model{
   // uninformative priors
-	logit_psi ~ normal(0,10);
-	logit_p ~ normal(0,10);
-	hypox_p ~ normal(0,10);
+  psi ~ normal(par_gs[1], par_gs[1]* cv_guess);
+	p ~ normal(par_gs[2], par_gs[2]* cv_guess);
+	hypox_p ~ normal(par_gs[3], par_gs[3]* cv_guess);
 
-
+// likelihoods
 	for(i in 1:N){
 		if(enc[i] > 0){
 			//the site was occupied, and you detected it
-			target += log_inv_logit(logit_psi) + bernoulli_logit_lpmf(1| logit_p + hypox_p*hypox[i]);
+			target += log_inv_logit(logit_p) + bernoulli_logit_lpmf(1| logit_psi + hypox_p*hypox[i]);
 		}else{
 			//the site was occupied but you didn't detect it & the site was unoccupied
-			target += log_sum_exp(log_inv_logit(logit_psi) + bernoulli_logit_lpmf(0| logit_p + hypox_p*hypox[i]), log1m_inv_logit(logit_psi));
+			target += log_sum_exp(log_inv_logit(logit_p) + bernoulli_logit_lpmf(0| logit_psi + hypox_p*hypox[i]), log1m_inv_logit(logit_p));
 		}
 	}
 }"
+# target +=  includes all additive constants in the log density 
+    # is adding whatever is after it to the target density (essentially like the joint density of params)
+# log_inv_logit(): natural logarithm of the inverse logit function of x
+# bernoulli_logit_lpmf(): The log Bernoulli probability mass of y given chance of success inv_logit(alpha)
+  ## chance-of-success param. is more stable if in logit scale & factors additive terms
+# log_sum_exp(): Return the natural logarithm of the sum of the natural exponent of x and the natural exponent of y
+# log1m_inv_logit(): natural logarithm of 1 minus the inverse logit function of x
+  #jacobian adjustment - aabsolute derivative of the inverse of the transformation; not present/detected
+### posterior depends on parameterization 
 
-# Creating data in list format necessary for Stan 
+#target += log_inv_logit(logit_p) + bernoulli_logit_lpmf(1| logit_psi + hypox_p*hypox[i]);
+
+###############################  Creating data in list format necessary for Stan ####################################
 occ.stan.dat <- list(N = N,
                      enc = enc,
-                     hypox = hypox)
+                     hypox = good_yr,
+                     par_gs = par_gs[1:3],
+                     cv_guess = 0.1)
+ 
+
 
 # Run Stan model 
 occ.stan <- stan(model_code = occ.mod,
-                 pars = c('psi','p','hypox_p'),
                  data = occ.stan.dat,
-                 chains = 1,
-                 warmup = 500,
-                 iter = 1000,
-                 #init = inits, #may need to be species specific 
-                 control = list(adapt_delta = 0.95))
-                 
+                 pars = c('psi', 'p', 'hypox_p'),
+                 chains = 2,
+                 warmup = 1000,
+                 iter = 3000,
+                 init = par_gs[1:3], #may need to be species specific 
+                 control = list(adapt_delta = 0.95)) #target acceptance prob.
+             
+
 # Check Stan model runs
 pairs(occ.stan)
+# below the diagnal (below medial acceptance rates) shows red then it is likely an issue with model
+# above the diagnal (above median acccpetance rates) red[divergence] - likely an issure with the adapt delta 
 traceplot(occ.stan)
+summary(occ.stan)$summary %>% head() # use to see the posterior estimates
+launch_shinystan(occ.stan)
+
 
