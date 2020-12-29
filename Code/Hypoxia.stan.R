@@ -13,7 +13,6 @@ library('dplR')
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
-
 ############################################## Simulated Data ######################################################
 load("DO_sims.Rdata")
 
