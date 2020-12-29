@@ -1,0 +1,12 @@
+-- 6/15/2020   BHH
+-- Link using the 12-digit trawl_id field
+-- Specimens are not collected for all species and only rarely on Unsatisfactory tows.  Therefore, there will be tows listed that do not have associated specimen records.  The intended analysis will dictate how those hauls are treated.
+-- Note that the grp_reg_depth_category field is a fisheries management construct.  It is simply a label in the taxonomy table that indicates what depth category the species falls in for regulatory purposes.  For instance, two fish of the same species, one caught on the Slope seabed, the other on a steep mesa (at much shallower depth) within the Slope will both be assigned the same depth category.  For most analyses, it is better to use the depth_m variable.
+-- DO measurements have been routinely collected on the West Coast Groundfish Slope/Shelf Bottom Trawl Survey beginning in 2009 and continue through the present.
+
+-- Haul Characteristics
+https://www.nwfsc.noaa.gov/data/api/v1/source/trawl.operation_haul_fact/selection.csv?filters=project=Groundfish Slope and Shelf Combination Survey,year>2014,year<2016&variables=project,trawl_id,operation_dim$operation_type,performance,latitude_dd,longitude_dd,year,date_yyyymmdd,depth_m,temperature_at_gear_c_der,o2_at_gear_ml_per_l_der,year_stn_invalid
+
+
+-- Specimens
+https://www.nwfsc.noaa.gov/data/api/v1/source/trawl.individual_fact/selection.csv?filters=project=Groundfish Slope and Shelf Combination Survey,year>2014,year<2016&variables=project,trawl_id,operation_dim$operation_type,latitude_dd,longitude_dd,best_available_taxonomy_dim$grp_reg_depth_category,best_available_taxonomy_dim$order_40,scientific_name,common_name,partition,length_cm,length_type,width_cm,width_type,net_touchdown_time,net_liftoff_time,sampling_start_hhmmss,sampling_end_hhmmss,depth_m,year,year_stn_invalid
