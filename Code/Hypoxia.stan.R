@@ -34,6 +34,7 @@ psi = 0.5 #occ.
 p = 0.2 #det.
 hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn but 1+ works
 
+par_gs <- c(psi, p, hypox.p)
 
 
 ############################################ factoring in hypoxia as a covariate ############################################ 
@@ -49,24 +50,27 @@ data{
 	int<lower=1> N; //number of samples
 	int<lower=0> enc[N]; //encounters
 	vector[N] hypox; //hypoxia
+	vector[3] par_gs; // parameter priors
+	real<lower=0> cv_guess;
 }
 parameters{
-	real logit_psi; //logit occupancy
-	real logit_p; //logit detection
+  real<lower=0, upper=1> psi;
+	real<lower=0, upper=1> p;
 	real hypox_p; //hypoxia slope
 }
 transformed parameters{
-	real<lower=0, upper=1> psi;
-	real<lower=0, upper=1> p;
-
-	psi = inv_logit(logit_psi);
-	p = inv_logit(logit_p);
+	real logit_psi;
+	real logit_p;
+	
+	logit_psi = logit(psi);
+	logit_p = logit(p);
+	
 }
 model{
   // uninformative priors
-	logit_psi ~ normal(0,10);
-	logit_p ~ normal(0,10);
-	hypox_p ~ normal(0,10);
+  psi ~ normal(par_gs[1], par_gs[1]* cv_guess);
+	p ~ normal(par_gs[2], par_gs[2]* cv_guess);
+	hypox_p ~ normal(par_gs[3], par_gs[3]* cv_guess);
 
 // likelihoods
 	for(i in 1:N){
@@ -94,16 +98,20 @@ model{
 ###############################  Creating data in list format necessary for Stan ####################################
 occ.stan.dat <- list(N = N,
                      enc = enc,
-                     hypox = good_yr)
+                     hypox = good_yr,
+                     par_gs = par_gs[1:3],
+                     cv_guess = 0.1)
+ 
+
 
 # Run Stan model 
 occ.stan <- stan(model_code = occ.mod,
-                 pars = c('psi','p','hypox_p'),
                  data = occ.stan.dat,
-                 chains = 4,
+                 pars = c('psi', 'p', 'hypox_p'),
+                 chains = 2,
                  warmup = 1000,
                  iter = 3000,
-                 #init = inits, #may need to be species specific 
+                 init = par_gs[1:3], #may need to be species specific 
                  control = list(adapt_delta = 0.95)) #target acceptance prob.
              
 
