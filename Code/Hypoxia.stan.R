@@ -29,19 +29,18 @@ inv_logit <- function(x){
 
 ############################################  Initial variables # OK NOW NEW VALUES FOR THESE THINGS? ######################
 N = length(good_yr)
-psi = 0.5 #occ.
-p = 0.2 #det.
+occ = 0.5 #occupied
+det = 0.2 #det.
 hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn but 1+ works
 
-par_gs <- c(psi, p, hypox.p)
-
+par_gs <- c(occ, det, hypox.p)
 
 ############################################ factoring in hypoxia as a covariate ############################################ 
-psi.full <- inv_logit(logit(psi) + hypox.p * good_yr)
+occ.full <- inv_logit(logit(occ) + hypox.p * good_yr)
 ## Why inverset then logit fxn?
 # encounters [0 or 1]
-enc <- rbinom(N, 1, psi.full) * rbinom(N, 1, p)
-
+enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
+table(enc) #good year: 1(observ.) makes up 9% and bad yr= 11%
 
 ###############################################  STAN MODEL  ############################################ 
 occ.mod <- "
@@ -53,32 +52,32 @@ data{
 	real<lower=0> cv_guess;
 }
 parameters{
-  real<lower=0, upper=1> psi;
-	real<lower=0, upper=1> p;
+  real<lower=0, upper=1> occ;
+	real<lower=0, upper=1> det;
 	real hypox_p; //hypoxia slope
 }
 transformed parameters{
-	real logit_psi;
-	real logit_p;
+	real logit_occ;
+	real logit_det;
 	
-	logit_psi = logit(psi);
-	logit_p = logit(p);
+	logit_occ = logit(occ);
+	logit_det = logit(det);
 	
 }
 model{
   // uninformative priors
-  psi ~ normal(par_gs[1], par_gs[1]* cv_guess);
-	p ~ normal(par_gs[2], par_gs[2]* cv_guess);
+  occ ~ normal(par_gs[1], par_gs[1]* cv_guess);
+	det ~ normal(par_gs[2], par_gs[2]* cv_guess);
 	hypox_p ~ normal(par_gs[3], par_gs[3]* cv_guess);
 
 // likelihoods
 	for(i in 1:N){
 		if(enc[i] > 0){
 			//the site was occupied, and you detected it
-			target += log_inv_logit(logit_p) + bernoulli_logit_lpmf(1| logit_psi + hypox_p*hypox[i]);
+			target += log_inv_logit(logit_det) + bernoulli_logit_lpmf(1| logit_occ + hypox_p*hypox[i]);
 		}else{
 			//the site was occupied but you didn't detect it & the site was unoccupied
-			target += log_sum_exp(log_inv_logit(logit_p) + bernoulli_logit_lpmf(0| logit_psi + hypox_p*hypox[i]), log1m_inv_logit(logit_p));
+			target += log_sum_exp(log_inv_logit(logit_det) + bernoulli_logit_lpmf(0| logit_occ + hypox_p*hypox[i]), log1m_inv_logit(logit_det));
 		}
 	}
 }"
@@ -106,7 +105,7 @@ occ.stan.dat <- list(N = N,
 # Run Stan model 
 occ.stan <- stan(model_code = occ.mod,
                  data = occ.stan.dat,
-                 pars = c('psi', 'p', 'hypox_p'),
+                 pars = c('occ', 'det', 'hypox_p'),
                  chains = 2,
                  warmup = 1000,
                  iter = 3000,
