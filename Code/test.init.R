@@ -5,6 +5,8 @@ library(rstan)
 library(bayesplot)
 library(shinystan)
 library('dplyr')
+library(purrr)
+library(readxl)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
@@ -34,24 +36,19 @@ inv_logit <- function(x){
 # dat = good_yr or bad_yr
 test.init <- function(dat) {
   N = length(dat)
-  for (i in 1:nrow(inits)){
-    #occ = 0.5 #occ.
-    #det = 0.25 #det.
-    #hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn but 1+ works
-    #subtract true value fromvalue/ true value --> SD
-    occ = inits$occ[i]
-    det = inits$det[i]
-    hypox.p = inits$hypox.p[i]
+  for (j in 1:nrow(inits)){
+   
+   occ = inits$occ[j]
+    det = inits$det[j]
+    hypox.p = inits$hypox.p[j]
     
-    # calculate the bias and precis.
     ############################################ factoring in hypoxia as a covariate ############################################ 
     occ.full <- inv_logit(logit(occ) + hypox.p * dat)
-    ## Why inverset then logit fxn?
+    
     # encounters [0 or 1]
     enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
     
     ###############################################  STAN MODEL  ############################################ 
-    
     occ.mod2 <- "
   	data{
   		int<lower=1> N; //number of samples
@@ -101,21 +98,23 @@ test.init <- function(dat) {
                          hypox = dat,
                          prior_mu = c(0, logit(det), 0),
                          prior_sd = c(1,1,1)) #flatter- 1
-    # Run Stan model 
-    occ.stan <- stan(model_code = occ.mod2,
-                     pars = c('occ','det','hypox_p','logit_det','logit_occ'),
-                     data = occ.stan.dat,
-                     chains = 4,
-                     warmup = 1000,
-                     iter = 4000,
-                     control = list(adapt_delta = 0.95)) #target acceptance prob.
-    traceplot(occ.stan) 
-    zzz <- summary(occ.stan)
-    
-    
-    inits$occ_bias[i] <-abs(zzz$summary[1, 1] - inits$occ[i]) / zzz$summary[1, 1] * 100
-    inits$det_bias[i] <- abs(zzz$summary[2, 1] - inits$det[i]) / zzz$summary[2, 1] * 100
-    inits$hypox.p_bias[i] <- abs(zzz$summary[3, 1] - inits$hypox.p[i]) / zzz$summary[3, 1] * 100
+
+
+ occ.stan <- stan(model_code = occ.mod2,
+                       pars = c('occ','det','hypox_p','logit_det','logit_occ'),
+                       data = occ.stan.dat,
+                       chains = 4,
+                       warmup = 1000,
+                       iter = 4000,
+                       control = list(adapt_delta = 0.95)) 
+         
+   
+       sum <- summary(occ.stan)
+
+    inits$occ_bias[j] <-abs(sum$summary[1, 1] - inits$occ[j]) / sum$summary[1, 1] * 100
+    inits$det_bias[j] <- abs(sum$summary[2, 1] - inits$det[j]) / sum$summary[2, 1] * 100
+    inits$hypox.p_bias[j] <- abs(sum$summary[3, 1] - inits$hypox.p[j]) / sum$summary[3, 1] * 100
+        View(inits)               
   }
   return(inits)
 }
@@ -135,3 +134,33 @@ inits_sm_b <- inits_bad %>%
   filter(occ_bias < 50) %>% 
   filter(det_bias < 50) %>% 
   filter(hypox.p_bias < 50) #.75/.75/1 -- .5/.5/1 -- .75/5/1 [1st - 2nd - 3rd] # 3rd not really close
+
+
+write.csv(zzz, "w_o_warnings_inits.csv")
+
+
+########################### failed checks for warnings ######################################################
+# check for warnings
+tryCatch({
+  warning("Examine the pairs() plot to diagnose sampling problems")
+}, warning=function(w) {
+  ## do something about the warning, maybe return 'NA'
+  message("handling warning: ", conditionMessage(w))
+  NA }) 
+
+
+# Run Stan model 
+occ.stan <- stan(model_code = occ.mod2,
+                 pars = c('occ','det','hypox_p','logit_det','logit_occ'),
+                 data = occ.stan.dat,
+                 chains = 4,
+                 warmup = 1000,
+                 iter = 4000,
+                 control = list(adapt_delta = 0.95)) #target acceptance prob.
+
+# make NA if warnings are present and report values if not
+if(is.na(x)){
+  inits$occ_bias[j] = x
+  inits$det_bias[j] = x
+  inits$hypox.p_bias[j] = x
+}else{
