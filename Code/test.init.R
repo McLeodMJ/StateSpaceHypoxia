@@ -38,7 +38,7 @@ test.init <- function(dat) {
   N = length(dat)
   for (j in 1:nrow(inits)){
    
-   occ = inits$occ[j]
+    occ = inits$occ[j]
     det = inits$det[j]
     hypox.p = inits$hypox.p[j]
     
@@ -99,25 +99,45 @@ test.init <- function(dat) {
                          prior_mu = c(0, logit(det), 0),
                          prior_sd = c(1,1,1)) #flatter- 1
 
+occ.stan <- stan(model_code = occ.mod2,
+             pars = c('occ','det','hypox_p','logit_det','logit_occ'),
+             data = occ.stan.dat,
+             chains = 4,
+             warmup = 2000,
+             iter = 6000,
+             control = list(adapt_delta = 0.95)) 
+ 
+sum <- summary(occ.stan)
 
- occ.stan <- stan(model_code = occ.mod2,
-                       pars = c('occ','det','hypox_p','logit_det','logit_occ'),
-                       data = occ.stan.dat,
-                       chains = 4,
-                       warmup = 1000,
-                       iter = 4000,
-                       control = list(adapt_delta = 0.95)) 
-         
-   
-       sum <- summary(occ.stan)
-
-    inits$occ_bias[j] <-abs(sum$summary[1, 1] - inits$occ[j]) / sum$summary[1, 1] * 100
-    inits$det_bias[j] <- abs(sum$summary[2, 1] - inits$det[j]) / sum$summary[2, 1] * 100
-    inits$hypox.p_bias[j] <- abs(sum$summary[3, 1] - inits$hypox.p[j]) / sum$summary[3, 1] * 100
-        View(inits)               
-  }
+  # Create if else statement of convergence using rhat > 1.05 to eliminate posteriors that do not converge
+  x <- rep(0, nrow(sum$summary))
+    for(s in 1: nrow(sum$summary)){
+      # insufficient rhat >=1.05
+      if(sum$summary[s, 10] >= 1.05){
+        x[s] = NA
+        x <- x[is.na(x)]
+      } 
+      #insufficient effect size <= 100
+      if(sum$summary[s, 9] <= 100){
+        x[s] = NA
+        x <- x[is.na(x)]
+      }
+    } #end small for loop
+  
+  # when insufficient --> make NA
+    if(is.na(x)){
+      inits$occ_bias[j] <- NA;
+      inits$det_bias[j] <- NA;
+      inits$hypox.p_bias[j] <- NA;
+   }else{
+     # when sufficient --> report posterior values
+      inits$occ_bias[j] <-abs(sum$summary[1, 1] - inits$occ[j]) / sum$summary[1, 1] * 100;
+      inits$det_bias[j] <- abs(sum$summary[2, 1] - inits$det[j]) / sum$summary[2, 1] * 100;
+      inits$hypox.p_bias[j] <- abs(sum$summary[3, 1] - inits$hypox.p[j]) / sum$summary[3, 1] * 100;
+    }
+  } #end fxn for loop
   return(inits)
-}
+} # end fxn
 
 ### run the function for good and bad years
 inits_good <- test.init(good_yr)
@@ -128,12 +148,12 @@ inits_bad <- test.init(bad_yr)
 inits_sm_g <- inits_good %>% 
   filter(occ_bias < 50) %>% 
   filter(det_bias < 50) %>% 
-  filter(hypox.p_bias < 50) #.75 /.75 /1 -- 0.5/.5/1  -- 0.75/.5/1 [1st - 2nd - 3rd]
+  filter(hypox.p_bias < 50) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
 
 inits_sm_b <- inits_bad %>% 
   filter(occ_bias < 50) %>% 
   filter(det_bias < 50) %>% 
-  filter(hypox.p_bias < 50) #.75/.75/1 -- .5/.5/1 -- .75/5/1 [1st - 2nd - 3rd] # 3rd not really close
+  filter(hypox.p_bias < 50) #.havent tested
 
 
 write.csv(zzz, "w_o_warnings_inits.csv")
@@ -148,19 +168,3 @@ tryCatch({
   message("handling warning: ", conditionMessage(w))
   NA }) 
 
-
-# Run Stan model 
-occ.stan <- stan(model_code = occ.mod2,
-                 pars = c('occ','det','hypox_p','logit_det','logit_occ'),
-                 data = occ.stan.dat,
-                 chains = 4,
-                 warmup = 1000,
-                 iter = 4000,
-                 control = list(adapt_delta = 0.95)) #target acceptance prob.
-
-# make NA if warnings are present and report values if not
-if(is.na(x)){
-  inits$occ_bias[j] = x
-  inits$det_bias[j] = x
-  inits$hypox.p_bias[j] = x
-}else{
