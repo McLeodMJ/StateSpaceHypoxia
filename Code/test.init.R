@@ -153,7 +153,7 @@ inits_sm_g <- inits_good %>%
 inits_sm_b <- inits_bad %>% 
   filter(occ_bias < 50) %>% 
   filter(det_bias < 50) %>% 
-  filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd]
+  filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd] then .75/.5/1
 
 
 write.csv(zzz, "w_o_warnings_inits.csv")
