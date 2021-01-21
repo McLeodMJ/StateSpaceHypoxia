@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Greenstriped rockfish 
 # Fishing rate is referred to as exploitation rate
 setwd("~/Box Sync/McLeod_thesis/Code")
-source("params.R")
+source("./Library/params.R")
 pars <- params("Grock")
 
 # IPM integration parameters:
@@ -62,14 +62,14 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 
 ### Create range of growth rates
   g.tmp <-  Len_sims[,,1] - (Len_sims[,,1] - Len_sims[,1,]) * exp(-pars$k * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
-   g. sd <- g.tmp * #coef of var in VB - typically .1
+   g.sd <- g.tmp * (pars$Linf.sd / pars$Linf) # do we want sd or cv here?
   
   
   g.mean <- colMeans(g.tmp) # Take the mean across all of the different trajectories for each value of x
   Len_sims[1,,] <- t(matrix(g.mean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
  
 ### convert to probability 
-  pg <- dnorm(Y, mean = Len_sims[1,,], sd = _____) # use dnorm to get the distribution of growth rates (using an arbitrarily small sd)
+  pg <- dnorm(Y, mean = Len_sims[1,,], sd = g.sd) # use dnorm to get the distribution of growth rates 
   pg[pg<0] = 0 # make sure no negatives
   
   
@@ -83,8 +83,6 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 
 # recruitment part of kernel 
 ```{r}
-
-
 for (t = 2:100){
  
   N[,t] <- MG %*%N[,t-1]*dx
