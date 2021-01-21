@@ -28,10 +28,10 @@ inv_logit <- function(x){
 
 ############################################  Initial variables # OK NOW NEW VALUES FOR THESE THINGS? ######################
 N = length(good_yr)
-occ = 0.5 #occ.
+occ = 0.75 #occ.
 det = 0.25 #det.
 hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn but 1+ works
-#subtract true value fromvalue/ true value --> SD
+#subtract true value from value/ true value --> SD
 
 # calculate the bias and precis.
 ############################################ factoring in hypoxia as a covariate ############################################ 
@@ -39,9 +39,7 @@ occ.full <- inv_logit(logit(occ) + hypox.p * good_yr)
 ## Why inverset then logit fxn?
 # encounters [0 or 1]
 enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
-table(enc)
-logit(occ)
-logit(det)
+
 ###############################################  STAN MODEL  ############################################ 
 
 occ.mod2 <- "
@@ -98,13 +96,17 @@ occ.stan <- stan(model_code = occ.mod2,
                  pars = c('occ','det','hypox_p','logit_det','logit_occ'),
                  data = occ.stan.dat,
                  chains = 4,
-                 warmup = 1000,
-                 iter = 4000,
+                 warmup = 2000,
+                 iter = 6000,
                  control = list(adapt_delta = 0.95)) #target acceptance prob.
+
+
 traceplot(occ.stan) 
+sum <-summary(occ.stan)
+pairs(occ.stan)
+ 
 
-
-#recompile to avoid crashing 
-m <- stan_model(occ.mod2)
-fit <- sampling(m, data= occ.stan.dat)
-traceplot(fit)
+# recompile to avoid crashing 
+# m <- stan_model(occ.mod2)
+# fit <- sampling(m, data= occ.stan.dat)
+#traceplot(fit)

@@ -30,7 +30,7 @@ inv_logit <- function(x){
 ############################################  Initial variables # OK NOW NEW VALUES FOR THESE THINGS? ######################
 N = length(good_yr)
 occ = 0.5 #occupied
-det = 0.2 #det.
+det = 0.25 #det.
 hypox.p = 1 # not sure what to do for this value which is used below in the inv-logit eqn but 1+ works
 
 par_gs <- c(occ, det, hypox.p)
