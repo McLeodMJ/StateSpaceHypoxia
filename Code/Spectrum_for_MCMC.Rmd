@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 
 setwd("~/Box Sync/McLeod_thesis/code")
+#setwd("/Users/montanamcleod/Documents/THESIS/StateSpaceHypoxia/Code/")
 DOdata <- read.delim("~/Box Sync/McLeod_thesis/Data/DO_Data.txt", comment.char="#")
 library(tidyverse)
 library(pracma)
@@ -63,7 +64,7 @@ missing.DO <- function(data){
   #start time in late May
   x <- data %>% 
     filter(time >= 150) %>% 
-    mutate(Jday = round(time, digits=0))
+    mutate(Jday = round(time, digits=1))
   
   # factoring in total days per sample period to reformat df
     xx <- x %>% 
@@ -78,7 +79,7 @@ missing.DO <- function(data){
   # accounts for missing values in dataset 
   y <- spread(y, Jday, DO, fill = NA)
   # establishes set time frame that can later be limited by annual sample period
-  z <-pivot_longer(y, cols=c('150':'263'), names_to = "Jday", values_to = "DO")
+  z <-pivot_longer(y, cols=c('150':'263.2'), names_to = "Jday", values_to = "DO") #change cols= if change # of jdays****
   z$Jday <- as.numeric(z$Jday)
   z <- inner_join(z, xx, by = 'year')
   
@@ -111,7 +112,7 @@ spec.yr <- function(dat, yr){
 # make X into a timeseries object
   z$Jday <- as.ordered(as.numeric(z$Jday))
   
-Dt <- ts(data=z$DO, start = c(min(z$Jday), 1), frequency = 1) #set frequency to 1 : everyday
+Dt <- ts(data=z$DO, start = c(min(z$Jday), 1), frequency = 10) #change freq= if change # of jdays****
 # note that this assumes sequential evenly-spaced sampling. If that is not the case we have to do some padding...
 Dt <- na.fill(Dt, "extend")
 
@@ -119,7 +120,7 @@ Dt <- na.fill(Dt, "extend")
 Dt_new <- Dt/sd(Dt, na.rm=TRUE)
 
 # detrend
-Time = seq(min(dat$Jday), max(dat$Jday), by=1)
+Time = seq(min(dat$Jday), max(dat$Jday), by=0.1) #change by() if change # of jdays****
 m <- lm(Dt_new ~ Time)
 Dt2 = m$resid
 Dt2 = Dt2/sd(Dt2) # rescale to unit variance
@@ -171,6 +172,7 @@ return(DsD)
 
 DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
 colnames(DsD) <- c("Year", "Period", "Freq_sq", "Signf", "Sim_DO")
+setwd("~/Box Sync/McLeod_thesis/code")
 save(DsD, file= "DO_sims.Rdata")
 # divide x by 10 -x axis by days
 
