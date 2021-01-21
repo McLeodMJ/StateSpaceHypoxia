@@ -1,39 +1,8 @@
-### Testing initial values of MCMC
+########################################################################################
+### Function to run multiple MCMCs to test different intial values for parameters
+# dat = good_yr or bad_yr (DO simulations - drawn from 'Data' folder)
+#########################################################################################
 
-setwd("~/Box Sync/McLeod_thesis/code")
-library(rstan)
-library(bayesplot)
-library(shinystan)
-library('dplyr')
-library(purrr)
-library(readxl)
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE)
-
-############################################## Simulated Data ######################################################
-load("DO_sims.Rdata")
-
-good_yr <- DsD[DsD$Year == 2015,5]
-bad_yr <- DsD[DsD$Year == 2018,5]
-
-
-######################################### initual values to test #####################################################
-inits <- read_excel("~/Box Sync/McLeod_thesis/Data/inits.csv")
-inits$occ_bias <- rep(NA, nrow(inits))
-inits$det_bias <- rep(NA, nrow(inits))
-inits$hypox.p_bias <- rep(NA, nrow(inits))
-
-
-############################################ Functions for transformations ##########################################
-logit <- function(x){
-  log(x/(1-x))
-}
-inv_logit <- function(x){
-  exp(x)/(exp(x)+1)
-}
-
-############################################  START OF FXN: inital variables ##########################################################
-# dat = good_yr or bad_yr
 test.init <- function(dat) {
   N = length(dat)
   for (j in 1:nrow(inits)){
@@ -43,7 +12,7 @@ test.init <- function(dat) {
     hypox.p = inits$hypox.p[j]
     
     ############################################ factoring in hypoxia as a covariate ############################################ 
-    occ.full <- inv_logit(logit(occ) + hypox.p * dat)
+    occ.full <- inv.logit(logit(occ) + hypox.p * dat)
     
     # encounters [0 or 1]
     enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
@@ -65,8 +34,8 @@ test.init <- function(dat) {
   	transformed parameters{
   		real<lower=0,upper=1> occ; // occupancy
   		real<lower=0,upper=1> det; // detection
-  		occ = inv_logit(logit_occ);
-  		det = inv_logit(logit_det);
+  		occ = inv.logit(logit_occ);
+  		det = inv.logit(logit_det);
   	}
   	model{
   	  // storage
@@ -138,33 +107,4 @@ sum <- summary(occ.stan)
   } #end fxn for loop
   return(inits)
 } # end fxn
-
-### run the function for good and bad years
-inits_good <- test.init(good_yr)
-inits_bad <- test.init(bad_yr)
-
-
-### check for smallest values of bias
-inits_sm_g <- inits_good %>% 
-  filter(occ_bias < 50) %>% 
-  filter(det_bias < 50) %>% 
-  filter(hypox.p_bias < 50) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
-
-inits_sm_b <- inits_bad %>% 
-  filter(occ_bias < 50) %>% 
-  filter(det_bias < 50) %>% 
-  filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd] then .75/.5/1
-
-
-write.csv(zzz, "w_o_warnings_inits.csv")
-
-
-########################### failed checks for warnings ######################################################
-# check for warnings
-tryCatch({
-  warning("Examine the pairs() plot to diagnose sampling problems")
-}, warning=function(w) {
-  ## do something about the warning, maybe return 'NA'
-  message("handling warning: ", conditionMessage(w))
-  NA }) 
 

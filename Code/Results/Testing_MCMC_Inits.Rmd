@@ -1,0 +1,78 @@
+---
+title: "Testing_inital_values"
+author: "Montana McLeod"
+date: "1/20/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load packages
+```{r}
+setwd("~/Box Sync/McLeod_thesis/code")
+require(rstan)
+require(bayesplot)
+require(shinystan)
+require('dplyr')
+require(purrr)
+require(readxl)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+```
+
+# input simulated data and functions
+```{r}
+load("DO_sims.Rdata")
+good_yr <- DsD[DsD$Year == 2015,5] #high DO levels
+bad_yr <- DsD[DsD$Year == 2018,5] #low DO levels
+
+source("./Library/test.init.R")
+source("./Library/logit.R")
+source("./Library/inv.logit.R")
+```
+
+# Load inital values to test as parameters for MCMC
+```{r}
+inits <- read_excel("~/Box Sync/McLeod_thesis/Data/inits.csv")
+### prepare empty column for bias test results
+inits$occ_bias <- rep(NA, nrow(inits))
+inits$det_bias <- rep(NA, nrow(inits))
+inits$hypox.p_bias <- rep(NA, nrow(inits))
+
+```
+
+# Test values and report bes results
+```{r}
+inits_good <- test.init(good_yr)
+inits_bad <- test.init(bad_yr)
+
+### check for smallest values of bias
+inits_sm_g <- inits_good %>% 
+  filter(occ_bias < 50) %>% 
+  filter(det_bias < 50) %>% 
+  filter(hypox.p_bias < 50) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
+
+inits_sm_b <- inits_bad %>% 
+  filter(occ_bias < 50) %>% 
+  filter(det_bias < 50) %>% 
+  filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd] then .75/.5/1
+```
+
+# REMOVE IF DONT USE
+```{r}
+#write.csv(zzz, "w_o_warnings_inits.csv") from when I manually ran simulations
+
+############################################ failed checks for warnings ######################################################
+# check for warnings
+tryCatch({
+  warning("Examine the pairs() plot to diagnose sampling problems")
+}, warning=function(w) {
+  ## do something about the warning, maybe return 'NA'
+  message("handling warning: ", conditionMessage(w))
+  NA }) 
+```
+
+
