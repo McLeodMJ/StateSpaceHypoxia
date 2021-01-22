@@ -29,8 +29,8 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 
 # Survival part of Kernel 
 ```{r}
- ### create a mesh grid of size changes
-   X = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
+### create a mesh grid of size changes
+ Size_c = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
    
 #### Survival part of kernel
  # m= pars$m
@@ -48,62 +48,48 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 # Growth part of the kernel 
 ```{r}
 ### create a mesh grid of size changes
-  Y = t(X) #- matrix of sizes at t+1 ## sizes same per row
+  Size_r = t(Size_c) #- matrix of sizes at t+1 ## sizes same per row
 
 ### Growth part of kernel. Do it this way so that we simulate many different growth trajectories in the population, averaged together.
   nLinfs = 1000 # how many different values of Linf to simulate
-  Len_sims <- array(rep(NA, nLinfs * length(x) * length(x)), c(nLinfs, length(x), length(x)))
   
 ### create Matrices of simulated sizes
   Linfs <- rnorm(n = nLinfs, mean = pars$Linf, sd = pars$Linf.sd) # vector of random dist. of Linfs- max lengths
-  Len_sims[,,1] <- matrix(Linfs, nrow = nLinfs, ncol = length(x)) # expand into a matrix so there is a corresponding value of Linf for each possible value in the length vector x
+  Linf_sims <- matrix(Linfs, nrow = nLinfs, ncol = length(x)) # expand into a matrix so there is a corresponding value of Linf for each possible value in the length vector x
   # ^ same values for each column to run against different size distr.
-  Len_sims[,1,] <- t(matrix(x, ncol = nLinfs, nrow = length(x))) # expand x into a matrix so there is a value for each value of Linfs.mat ## size changes per column and goes up to mesh max size 
+  Size_chge <- t(matrix(x, ncol = nLinfs, nrow = length(x))) # expand x into a matrix so there is a value for each value of Linfs.mat ## size changes per column and goes up to mesh max size 
 
 ### Create range of growth rates
-  g.tmp <-  Len_sims[,,1] - (Len_sims[,,1] - Len_sims[,1,]) * exp(-pars$k * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
-   g.sd <- g.tmp * (pars$Linf.sd / pars$Linf) # do we want sd or cv here?
+  VBlengths <-  Linf_sims - (Linf_sims - Size_chge) * exp(-pars$k * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
+   VBsd <- VBlengths* (pars$Linf.sd / pars$Linf) # do we want sd or cv here?
   
   
-  g.mean <- colMeans(g.tmp) # Take the mean across all of the different trajectories for each value of x
-  Len_sims[1,,] <- t(matrix(g.mean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
+  VBmean <- colMeans(VBlengths) # Take the mean across all of the different trajectories for each value of x
+  Leng_mean <- t(matrix(VBmean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
  
 ### convert to probability 
-  pg <- dnorm(Y, mean = Len_sims[1,,], sd = g.sd) # use dnorm to get the distribution of growth rates 
+  pg <- dnorm(Size_r, mean = Leng_mean, sd = VBsd) # use dnorm to get the distribution of growth rates 
   pg[pg<0] = 0 # make sure no negatives
-  
-  
-### If adding fecundity too:
-  Rvec = dnorm(Y, pars$rec, pars$rec.sd) # size distribution of recruits
-  Fec = pars$fec.const * X^(pars$fec.exp) # you can use values of 1 and 3 for these... 
-  Q = Fec * Rvec # combine the two
-  
+
+### Run the kernel as prob. death * growth
+  K = pm * pg 
+  plot(K, type='l')
 ```
 
 
 # recruitment part of kernel 
 ```{r}
-for (t = 2:100){
- 
-  N[,t] <- MG %*%N[,t-1]*dx
-  E[,t] <- F %*% N[,t-1]*dx
-  
-  #BH step
-  Eggs = sum(E[,t])*dx
-  Recruits = a * Eggs/(1 + a/b*Eggs)
-  
-  N[,t] = N[,t] + Recruits*Rvec 
-  
-  
-}
-```
+### If adding fecundity too:
+  Rvec = dnorm(x, pars$rec, pars$rec.sd) # size distribution of recruits
+  Fec = pars$fec.const * Size_c ^(pars$fec.exp)  
+  Fe = Fec * Rvec # combine the two
 
+```
+ 
 
 # run kernel 
 ```{r}
-K = pm * pg
-K = K + Q; # add in fecundity to the growth/survival part
-plot(K, type='l')
+#K = K + Q; # add in fecundity to the growth/survival part
 ```
 
 # run the model 
@@ -111,19 +97,25 @@ plot(K, type='l')
 ### Initialize the model:
   time = 1000
   N = matrix(0, nrow = meshsize, ncol = time)
-  N[,1] <- Rvec  * pars$Rmu # initialize with one pulse of new recruits
+  N[,1] <- Rvec  #* pars$Rmu  initialize with one pulse of new recruits
 
 ### Run the model
   for (t in 2:time){
     N[,t] <- K %*% N[,t-1] * dx  #+  Rvec  * pars$Rmu # midpoint rule integration
+    E[,t] <- Fe %*% N[,t-1] * dx
+  
+  #BH step
+  Eggs = sum(E[,t])*dx
+  Recruits <- a * Eggs/(1 + a/b*Eggs)
+  
+  N[,t] = N[,t] + Recruits*Rvec 
   }
-
+  
 ### total population size:
   sum(N[ ,time] * dx)
 
 plot(x, N[ ,time], type = 'l')
 plot(colSums(N) * dx)
-
 ```
 
 
