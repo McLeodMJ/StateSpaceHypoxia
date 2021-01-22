@@ -10,9 +10,12 @@ params <- function(sp){
   # Female Parameters
   if(sp == "Dsole"){
    Params <- list(
-    rec = 11,  #unfished R0 - ln(r0) or # 380777 recruits
+    rec = 12.85,  #unfished R0 - ln(r0) or # 380777 recruits
     rec.sd = 0.35, #fixed
-    f = 0.131,
+    steep = 0.8, 
+    s0 = 469,866,
+    sy = 393,507,
+    f = 0.017,
     fec.const = 0.000002805, #linear to weight
     fec.exp = 3.345,
     m = 0.1165,
@@ -29,6 +32,9 @@ params <- function(sp){
     Params <- list( 
       rec = 9.0669, #ln(r0) // #8037
       rec.sd = 0.16454, #have 95% CI
+      steep = 0.7,
+      s0 = 37974, #unit is mt
+      sy = 21974, # unit not  reported by probs mt
       f = 0.115,
       fec.const = 0.00000276,
       fec.exp = 3.28,
@@ -46,6 +52,9 @@ params <- function(sp){
     Params <- list( 
       rec = 9.62,# - ln(R0) // 15041 recruits
       rec.sd = 0.15, # 95 CI: 2073-109,131
+      steep = 0.69,
+      s0 = 7090,
+      sy =2836,
       f = 0.0682, #exploitation rate: SPR(msy)
       fec.const = 1,
       fec.exp = 3,
@@ -61,8 +70,11 @@ params <- function(sp){
   # Parameters from Northern model & Female
  if(sp == "Yrock"){
     Params <- list( 
-      rec = 9.65, # ln(R0) // 49090000 recruits
+      rec = 10.83, # ln(R0) // 49090000 recruits
       rec.sd = 0.15, #95 ci: 17.86-134.94 mil
+      steep = 0.718,
+      s0 = 14.996, #trillion eggs
+      sy = 11.278, #trillion eggs
       f = 0.089, #95 CI: 0.085-0.093
       fec.const = 1.1185e-11,
       fec.exp = 4.59,
