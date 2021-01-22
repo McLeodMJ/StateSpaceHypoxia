@@ -56,8 +56,8 @@ params <- function(sp){
       s0 = 7090,
       sy =2836,
       f = 0.0682, #exploitation rate: SPR(msy)
-      fec.const = 1,
-      fec.exp = 3,
+      fec.const = 371200, #fec. intercept
+      fec.exp = 63300, #fec. slope
       m = 0.08, 
       m.sd = NA, # 95 AI: 0.02-.4
       k = 0.11,
