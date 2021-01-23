@@ -11,11 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # create mesh: sizes that we are running the IPM over
 ```{r}
-# Greenstriped rockfish 
+# Lingcod 
 # Fishing rate is referred to as exploitation rate
 setwd("~/Box Sync/McLeod_thesis/Code")
 source("./Library/params.R")
-pars <- params("Grock")
+pars <- params("Lingcod")
 
 # IPM integration parameters:
 meshsize = 100
@@ -61,29 +61,32 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 
 ### Create range of growth rates
   VBlengths <-  Linf_sims - (Linf_sims - Size_chge) * exp(-pars$k * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
-   VBsd <- VBlengths* (pars$Linf.sd / pars$Linf) # do we want sd or cv here?
-  
   
   VBmean <- colMeans(VBlengths) # Take the mean across all of the different trajectories for each value of x
+  VBsd <- VBmean * (pars$Linf.sd) # we want SD here
+  
   Leng_mean <- t(matrix(VBmean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
  
 ### convert to probability 
   pg <- dnorm(Size_r, mean = Leng_mean, sd = VBsd) # use dnorm to get the distribution of growth rates 
+  # OUTPUTS 1000 X 100 MATRIX DUE TO SD VALUE WHEN IT NEEDS TO BE 100 X 100 MATRIX TO GO INTO FOR LOOP
   pg[pg<0] = 0 # make sure no negatives
 
 ### Run the kernel as prob. death * growth
   K = pm * pg 
-  plot(K, type='l')
+  plot(K, type='l') # when mortality is 0 we want to see continuous growth 
 ```
 
 
 # recruitment part of kernel 
+## I think this is where we loose the resilence of the IPM
 ```{r}
 ### If adding fecundity too:
   Rvec = dnorm(x, pars$rec, pars$rec.sd) # size distribution of recruits
-  Fec = pars$fec.const * Size_c ^(pars$fec.exp)  
+  Fec = pars$fec.const * Size_c ^(pars$fec.exp)  #leads to much smaller values than sample IPM 
   Fe = Fec * Rvec # combine the two
-
+  # Fe values are very small although in the right spot, problem????
+  plot(colSums(Fe), type= 'l') # does get bigger with size but very slight 
 ```
  
 
@@ -96,7 +99,10 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 ```{r}
 ### Initialize the model:
   time = 1000
-  N = matrix(0, nrow = meshsize, ncol = time)
+  N = matrix(0, nrow = meshsize, ncol = time) #pop size w/ growth/mortal kernel
+  E = matrix(0, nrow = meshsize, ncol = time) #pop size w/ ^^ & fecundity
+  Ntest = matrix(0, nrow = meshsize, ncol = time) #pop size w/ ^^ & recruits added
+  
   N[,1] <- Rvec  #* pars$Rmu  initialize with one pulse of new recruits
 
 ### Run the model
@@ -104,18 +110,20 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
     N[,t] <- K %*% N[,t-1] * dx  #+  Rvec  * pars$Rmu # midpoint rule integration
     E[,t] <- Fe %*% N[,t-1] * dx
   
-  #BH step
+  ###BH step
+    #' BH eqn: (Methot and Tylor 2011 - eqn A.7)
+    #' Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
   Eggs = sum(E[,t])*dx
-  Recruits <- a * Eggs/(1 + a/b*Eggs)
+  Recruits <- (4 * pars$steep * pars$rec * Eggs) / ((pars$s0 * (1 - pars$steep)) + (Eggs * (5 * pars$steep - 1)))
   
-  N[,t] = N[,t] + Recruits*Rvec 
+  Ntest[,t] = N[,t] + Recruits * Rvec 
   }
   
 ### total population size:
-  sum(N[ ,time] * dx)
+  sum(Ntest[ ,time] * dx)
 
-plot(x, N[ ,time], type = 'l')
-plot(colSums(N) * dx)
+plot(x, Ntest[ ,time], type = 'l')
+plot(colSums(Ntest) * dx, type='l')
 ```
 
 
