@@ -6,12 +6,14 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+require("knitr")
+opts_knit$set(root.dir = "~/Box Sync/McLeod_thesis/code")
 ```
+
 
 # load packages
 ```{r}
-setwd("~/Box Sync/McLeod_thesis/code")
+#setwd("~/Box Sync/McLeod_thesis/code")
 require(rstan)
 require(bayesplot)
 require(shinystan)
@@ -25,7 +27,7 @@ rstan_options(auto_write = TRUE)
 
 # input simulated data and functions
 ```{r}
-load("DO_sims.Rdata")
+load("../Data/DO_sims.Rdata")
 good_yr <- DsD[DsD$Year == 2015,5] #high DO levels
 bad_yr <- DsD[DsD$Year == 2018,5] #low DO levels
 
@@ -51,14 +53,16 @@ inits_bad <- test.init(bad_yr)
 
 ### check for smallest values of bias
 inits_sm_g <- inits_good %>% 
-  filter(occ_bias < 50) %>% 
-  filter(det_bias < 50) %>% 
-  filter(hypox.p_bias < 50) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
+  filter(occ_bias < 40) %>% 
+  filter(det_bias < 40) %>% 
+  filter(hypox.p_bias < 40) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
 
 inits_sm_b <- inits_bad %>% 
   filter(occ_bias < 50) %>% 
   filter(det_bias < 50) %>% 
   filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd] then .75/.5/1
+
+save(inits_sm_g, inits_sm_b, file= "inits_bias.Rdata")
 ```
 
 # REMOVE IF DONT USE
