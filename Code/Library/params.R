@@ -23,7 +23,7 @@ params <- function(sp){
     k = 0.1497,
     k.sd = 0.0078,
     Linf = 47.81,
-    Linf.sd = (0.114 * 47.81) )#sd = .114
+    Linf.cv = 0.114 )
     
   }
   
@@ -43,7 +43,7 @@ params <- function(sp){
       k = 0.0173,
       k.sd = NA,
       Linf = 108.6,
-      Linf.sd = (0.06 * 108.6)) #cv= .06
+      Linf.cv = 0.06 ) 
     
   }
   
@@ -63,7 +63,7 @@ params <- function(sp){
       k = 0.11,
       k.sd = 0.003,
       Linf = 33.67,
-      Linf.sd = (0.07 * 33.67)) #cv is 0.07
+      Linf.cv = 0.07)
     
   }
   
@@ -83,7 +83,7 @@ params <- function(sp){
       k = 0.17,
       k.sd = NA, #literature values used/ do not give SD
       Linf = 52.2,
-      Linf.sd = 3) #do not give SD - estimated from figure 5 (northern/ female)
+      Linf.cv = 0.1) #do not give SD or CV - SD estimated from figure 5 (northern/ female) as 3
    }
   return(Params)
 }
