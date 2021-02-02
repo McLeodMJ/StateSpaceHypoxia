@@ -6,10 +6,11 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+require("knitr")
+opts_knit$set(root.dir = "~/Box Sync/McLeod_thesis/code")
+```
 
-setwd("~/Box Sync/McLeod_thesis/code")
-#setwd("/Users/montanamcleod/Documents/THESIS/StateSpaceHypoxia/Code/")
+```{r}
 DOdata <- read.delim("~/Box Sync/McLeod_thesis/Data/DO_Data.txt", comment.char="#")
 library(tidyverse)
 library(pracma)
@@ -102,6 +103,108 @@ dat_NA <- missing.DO(DOdata)
   
 ```
 
+# function for timeseries simulations & FFT
+```{r}
+spec.yr <- function(dat, yr){
+  dat <- subset(dat, year == yr)
+  z = dat
+  # make X into a timeseries object
+  z$Jday <- as.ordered(as.numeric(z$Jday))
+  
+  Dt <- ts(data=z$DO, start = c(min(z$Jday), 1), frequency = 10) #change freq= if change # of jdays****
+  # note that this assumes sequential evenly-spaced sampling. If that is not the case we have to do some padding...
+  Dt <- na.fill(Dt, "extend")
+  
+  # scale to unit variance
+  Dt_new <- Dt/sd(Dt, na.rm=TRUE)
+  
+  # detrend
+  Time = seq(min(dat$Jday), max(dat$Jday), by=0.1) #change by() if change # of jdays****
+  m <- lm(Dt_new ~ Time)
+  Dt2 = m$resid
+  Dt2 = Dt2/sd(Dt2) # rescale to unit variance
+  
+  
+  ### Red noise significance cutoff (based on Torrence & Compo 1998)
+  # get ar scale
+  Dt.ar <- ar(Dt2, na.action=na.pass)
+  Dt.ar #1.0398
+  lag1 = Dt.ar[[2]][1]  # Get this value from the ar() operation above #coefficient correlation btw successive pts
+  
+  # limit the coefficents that are >1 to be just less than 1
+  lag1 <- ifelse(lag1 >=1, 0.99, lag1)
+  
+  fft_theor <- (1 - lag1^2) / (1 - 2 * lag1 * cos(Dt2*2*pi) + lag1^2) #eqn 16 w/in cos() should have / length(f) # No - f is already equal to k/N in their notation
+  fft_theor <- var(Dt2, na.rm=TRUE) * fft_theor / (2 * length(Dt2)) #rescaling for unit variance?
+  chi2 = qchisq(0.05, 2, lower.tail=FALSE) / 2
+  signif = chi2*fft_theor #significance level
+ 
+  # Simulating new datasets based on the FFT
+  N = 100
+  Sim_DO <- data.frame(sim = rep(seq(1:N), each = nrow(dat)) ,
+                       DO = rep(NA,N*nrow(dat)))
+  Sim_DO_matrix <- matrix(NA, nrow = 100, ncol = length(Dt2))
+  
+  #simulated ffts all saved in one column
+  for( j in 1:N){
+    # We do this by randomizing the phase (imaginary part) of the FFT spectrum
+    Theta <- runif(n=length(Dt2)) * 2 * pi # 2pi converts to radians
+    # Now do inverse FFT with modulus (real part) of original FFT but randomized phase
+    Z = Re(fft(Dt2)) * exp(1i*Theta) 
+    Z = Re(ifft(Z))
+    sim_DO = Z * sd(Dt) + mean(Dt)
+    Sim_DO[Sim_DO$sim == j,2] <- sim_DO
+    Sim_DO_matrix[j,] <- sim_DO
+  }
+  # make negative simDO = 0
+# Sim_DO[ Sim_DO[,2] < 0] = 0
+
+ 
+  Sim_DO$signif <- signif
+  Sim_DO$dt2 <- Dt2
+  Sim_DO$time <- 1: nrow(Sim_DO)
+  
+  Sims <- list( Sim_DO = Sim_DO,
+                Sim_DO_matrix = Sim_DO_matrix)
+  
+  return(Sims)
+}
+  good_yr <- spec.yr(dat_NA, 2015)
+  bad_yr <- spec.yr(dat_NA, 2018)
+```
+  
+  
+  
+# FFT based on Simulations and detrend
+```{r}
+  # Now do the FFT
+  f <- seq(from=0, to=0.5, length.out = ceiling(nrow(bad_yr) / 2)) # vector of frequencies
+  F0 <- abs((fft(bad_yr$dt2[1:nrow(bad_yr)/10]) ) ) / length(bad_yr$dt2[1:nrow(bad_yr)/10])
+  F0 = F0[1:length(f)]
+  Freq <- abs((fft(bad_yr$DO) ) ) / length(bad_yr$DO)
+  Freq = Freq[1:length(f)]
+  fft_sims <- data.frame(Period = 1/f, F0.sq = F0^2, Freq.sq = Freq^2)
+  
+ fft_sims <- do.call(data.frame,lapply(fft_sims, function(x) replace(x, is.infinite(x),NA)))
+  fft_sims <- na.omit(fft_sims)
+  
+  # simulated data for 10-yrs (these are shown as continuous but really gap in ts for off-season months)
+  bad <- ggplot(bad_yr, aes(time, DO))+
+           geom_line(alpha=0.7) +
+          labs(title= "Low DO")
+  good <- ggplot(good_yr, aes(time, DO))+
+           geom_line(alpha=0.5, color = "blue")+
+            labs(title= "Standard DO")
+  good+bad
+  
+# plot the data
+plot(1/f,log(Freq^2),type='l',xlim=c(0,1100), xlab= "Period", ylab= "Freq.sq", main= "Low DO Year")
+lines(1/f,log(F0^2),type='l',col='red')
+legend("bottom", legend = c("Simulations", "detrend"), pch = c(15, 15), col = c("black", "red"))
+```
+
+
+#OLD - remove if above is cleared #########
 
 # using the interpolated results
 ```{r}
@@ -152,7 +255,6 @@ DsD <-  data.frame(Period = 1/f,
 DsD <- cbind(rep(yr, nrow(DsD)), DsD)
 
 # Simulating new datasets based on the FFT
-
 N = 100
 ZZ <- matrix(NA, nrow = 100, ncol = length(f))
 for( j in 1:N){
@@ -163,6 +265,8 @@ for( j in 1:N){
   Z = Re(ifft(Z))
   ZZ[j,] = Z * sd(Dt) + mean(Dt)
 }
+
+#this takes only one simulation when I believe we want multiple
 DsD$Sim_DO <- ZZ[N,]
 
 # make negative simDO - 0
@@ -181,10 +285,6 @@ DsD <- do.call(data.frame,lapply(DsD, function(x) replace(x, is.infinite(x),NA))
 DsD <- na.omit(DsD)
 plot(DsD$Sim_DO, type='l')
 
-ggplot(DsD, aes(x=Period, Freq_sq, color=Year))+
-  geom_line()+
-  facet_wrap(~Year) 
-  #scale_x_continuous() #made dataframe by the day instead of 10 timepts per day
 
 ggplot(DsD, aes(Period, Freq_sq))+
   geom_line()+
@@ -211,7 +311,6 @@ fft_theor <- var(Dt2, na.rm=TRUE) * fft_theor / (2 * length(f)) #rescaling for u
 chi2 = qchisq(0.05, 2, lower.tail=FALSE) / 2
 signif = chi2*fft_theor
 
-good_yr$signif = signif
 
 ggplot(DsD, aes(Period, Freq_sq))+
   geom_line()+
