@@ -6,19 +6,19 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+require("knitr")
+opts_knit$set(root.dir = "~/Box Sync/McLeod_thesis/code")
 ```
 
 # create mesh: sizes that we are running the IPM over
 ```{r}
 # Lingcod 
 # Fishing rate is referred to as exploitation rate
-setwd("~/Box Sync/McLeod_thesis/Code")
 source("./Library/params.R")
 pars <- params("Lingcod")
 
 # IPM integration parameters:
-meshsize = 100
+meshsize = 200
 meshmin = 0
 meshmax = pars$Linf * 2
 
@@ -26,17 +26,19 @@ x <- seq(from = meshmin, to = meshmax, length.out = meshsize) # different size c
 dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* left rule
 
 ```
-
-# Survival part of Kernel 
+# Kernel: transition from size x --> y for different size classes
+### K(y,x) = Pg(y,x) + Fe(y,x)
+## Survival part of Kernel 
 ```{r}
 ### create a mesh grid of size changes
  Size_c = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
    
 #### Survival part of kernel
- # m= pars$m
- m=0  #check with mort. =0 - # should be dist. around Linf
+  #m=0 #check with mort. =0 
+  m= pars$M 
+ 
 ### convert to probability
- timestep = 1
+ timestep = 1 # 1yr
  pm <- exp(-m * timestep) # prob. survival
   # increases with size
  pm[pm<0] = 0 # make sure no negatives 
@@ -54,27 +56,27 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
   nLinfs = 1000 # how many different values of Linf to simulate
   
 ### create Matrices of simulated sizes
-  Linfs <- rnorm(n = nLinfs, mean = pars$Linf, sd = pars$Linf.sd) # vector of random dist. of Linfs- max lengths
+  Linfs <- rnorm(n = nLinfs, mean = pars$Linf, (pars$Linf.cv *pars$Linf)) # vector of random dist. of Linfs- max lengths
   Linf_sims <- matrix(Linfs, nrow = nLinfs, ncol = length(x)) # expand into a matrix so there is a corresponding value of Linf for each possible value in the length vector x
   # ^ same values for each column to run against different size distr.
   Size_chge <- t(matrix(x, ncol = nLinfs, nrow = length(x))) # expand x into a matrix so there is a value for each value of Linfs.mat ## size changes per column and goes up to mesh max size 
 
 ### Create range of growth rates
-  VBlengths <-  Linf_sims - (Linf_sims - Size_chge) * exp(-pars$k * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
+  VBlengths <-  Linf_sims - (Linf_sims - Size_chge) * exp(-pars$K * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
   
   VBmean <- colMeans(VBlengths) # Take the mean across all of the different trajectories for each value of x
-  VBsd <- VBmean * (pars$Linf.sd) # we want SD here
-  
   Leng_mean <- t(matrix(VBmean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
+  
+  VBsd <- VBmean * (pars$Linf.cv)
+  Leng_sd <- t(matrix(VBsd, nrow = length(x), ncol = length(x))) 
  
 ### convert to probability 
-  pg <- dnorm(Size_r, mean = Leng_mean, sd = VBsd) # use dnorm to get the distribution of growth rates 
-  # OUTPUTS 1000 X 100 MATRIX DUE TO SD VALUE WHEN IT NEEDS TO BE 100 X 100 MATRIX TO GO INTO FOR LOOP
+  pg <- dnorm(Size_r, mean = Leng_mean, sd = Leng_sd) # use dnorm to get the distribution of growth rates 
   pg[pg<0] = 0 # make sure no negatives
-
+  
 ### Run the kernel as prob. death * growth
   K = pm * pg 
-  plot(K, type='l') # when mortality is 0 we want to see continuous growth 
+  plot(colSums(K)*dx, type='l')
 ```
 
 
@@ -82,48 +84,125 @@ dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* 
 ## I think this is where we loose the resilence of the IPM
 ```{r}
 ### If adding fecundity too:
-  Rvec = dnorm(x, pars$rec, pars$rec.sd) # size distribution of recruits
-  Fec = pars$fec.const * Size_c ^(pars$fec.exp)  #leads to much smaller values than sample IPM 
-  Fe = Fec * Rvec # combine the two
+  Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd) # size distribution of recruits 
+
+ Fec <- pars$fec.const * Size_c ^(pars$fec.exp)  #leads to much smaller values than sample IPM 
+ Fe <- Fec * Rvec # combine the two
   # Fe values are very small although in the right spot, problem????
-  plot(colSums(Fe), type= 'l') # does get bigger with size but very slight 
+  plot(colSums(Fe), type= 'l') 
 ```
  
-
-# run kernel 
-```{r}
-#K = K + Q; # add in fecundity to the growth/survival part
-```
 
 # run the model 
 ```{r}
 ### Initialize the model:
-  time = 1000
+  time = 100
   N = matrix(0, nrow = meshsize, ncol = time) #pop size w/ growth/mortal kernel
   E = matrix(0, nrow = meshsize, ncol = time) #pop size w/ ^^ & fecundity
-  Ntest = matrix(0, nrow = meshsize, ncol = time) #pop size w/ ^^ & recruits added
   
-  N[,1] <- Rvec  #* pars$Rmu  initialize with one pulse of new recruits
+  N[,1] <- Rvec * 2e6 # pars$Rmu  initialize with one pulse of new recruits
 
-### Run the model
+  ### Run the model
   for (t in 2:time){
-    N[,t] <- K %*% N[,t-1] * dx  #+  Rvec  * pars$Rmu # midpoint rule integration
-    E[,t] <- Fe %*% N[,t-1] * dx
+    N[,t] <- K %*% N[,t-1]  * dx  #+  Rvec  * pars$Rmu # midpoint rule integration
+     E[,t] <- Fe %*% N[,t-1] * dx
+
+  ### BH step
+    ## BH eqn: (Methot and Tylor 2011 - eqn A.7)
+    # Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
+  Eggs = sum(E[,t])*dx 
   
-  ###BH step
-    #' BH eqn: (Methot and Tylor 2011 - eqn A.7)
-    #' Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
-  Eggs = sum(E[,t])*dx
-  Recruits <- (4 * pars$steep * pars$rec * Eggs) / ((pars$s0 * (1 - pars$steep)) + (Eggs * (5 * pars$steep - 1)))
-  
-  Ntest[,t] = N[,t] + Recruits * Rvec 
+  a =((Eggs/exp(pars$R0))*(1-pars$steep)) / 4*pars$steep
+  b=(5*pars$steep -1) / (4*pars$steep *exp(pars$R0))
+  Recruits = a * Eggs/(1 + a/b*Eggs)
+  #Recruits = a*pars$S0 / (b + pars$S0)
+  #Recruits <- (4 * pars$steep * exp(pars$R0) * Eggs) / ((pars$S0 * (1 - pars$steep)) + (Eggs * (5 * pars$steep - 1)))
+   N[,t] = N[,t] + Recruits * Rvec 
   }
   
 ### total population size:
-  sum(Ntest[ ,time] * dx)
+MR <- sum(N[ ,time] * dx)
+N0 <- N[,time]
 
-plot(x, Ntest[ ,time], type = 'l')
-plot(colSums(Ntest) * dx, type='l')
+par(mfrow = c(1,2))
+plot(x, N[ ,time], type = 'l') #shows hump around Linf
+plot(colSums(N), type='l')
+
+#df <- data.frame(Size = x, Frequency = N[, time] / MR)
+#ggplot(data = df, aes(x = Size, y = Frequency)) + geom_line()
+
 ```
 
 
+
+# Test mesh sizes 
+```{r}
+zzz <- seq(10, 200, by=2)
+z <- rep(NA, length = length(zzz))
+abund <- rep(NA, length = length(zzz))
+for(i in 1:length(zzz)){
+    # IPM integration parameters:
+     x <- seq(from = meshmin, to = meshmax, length.out = zzz[i]) # different size classes
+     Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)
+     z[i] <- sum(Rvec)
+     # this should integrate to unity (1) - does it?
+  Size_c = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
+  
+     ### create a mesh grid of size changes
+  Size_r = t(Size_c) #- matrix of sizes at t+1 ## sizes same per row
+
+### Growth part of kernel. Do it this way so that we simulate many different growth trajectories in the population, averaged together.
+  nLinfs = 1000 # how many different values of Linf to simulate
+  
+### create Matrices of simulated sizes
+  Linfs <- rnorm(n = nLinfs, mean = pars$Linf, sd = (pars$Linf.cv *pars$Linf)) # vector of random dist. of Linfs- max lengths
+  Linf_sims <- matrix(Linfs, nrow = nLinfs, ncol = length(x)) # expand into a matrix so there is a corresponding value of Linf for each possible value in the length vector x
+  # ^ same values for each column to run against different size distr.
+  Size_chge <- t(matrix(x, ncol = nLinfs, nrow = length(x))) # expand x into a matrix so there is a value for each value of Linfs.mat ## size changes per column and goes up to mesh max size 
+
+### Create range of growth rates
+  VBlengths <-  Linf_sims - (Linf_sims - Size_chge) * exp(-pars$K * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
+  
+  VBmean <- colMeans(VBlengths) # Take the mean across all of the different trajectories for each value of x
+  Leng_mean <- t(matrix(VBmean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
+  
+  VBsd <- VBmean * (pars$Linf.cv)
+  Leng_sd <- t(matrix(VBsd, nrow = length(x), ncol = length(x))) 
+ 
+### convert to probability 
+  pg <- dnorm(Size_r, mean = Leng_mean, sd = Leng_sd) # use dnorm to get the distribution of growth rates 
+  pg[pg<0] = 0 # make sure no negatives
+  
+### Run the kernel as prob. death * growth
+  K = pm * pg 
+  
+    Fec <- pars$fec.const * Size_c ^(pars$fec.exp)  #leads to much smaller values than sample IPM 
+  Fe <- Fec * Rvec # combine the two
+  
+    time = 1000
+    N = matrix(0, nrow = zzz[i], ncol = time) #pop size w/ growth/mortal kernel
+    E = matrix(0, nrow = zzz[i], ncol = time) #pop size w/ ^^ & fecundity
+  
+    N[,1] <- Rvec * 1000 #* pars$Rmu  initialize with one pulse of new recruits
+  
+  ### Run the model
+    for (t in 2:time){
+      N[,t] <- K %*% N[,t-1] * dx  #+  Rvec  * pars$Rmu # midpoint rule integration
+       E[,t] <- Fe %*% N[,t-1] * dx
+      Eggs = sum(E[,t])*dx
+      Recruits <- (4 * pars$steep * exp(pars$R0) * Eggs) / ((pars$S0 * (1 - pars$steep)) + (Eggs * (5 * pars$steep - 1)))
+      
+      N[,t] = N[,t] + Recruits * Rvec 
+      
+   ### total population size:
+    MR <- sum(N[ ,time] * dx)
+    abund[i] <- MR
+ }
+ abund ; z 
+
+
+}
+par(mfrow= c(1,2))
+plot(z, type='l')
+plot(abund, type='l')
+```
