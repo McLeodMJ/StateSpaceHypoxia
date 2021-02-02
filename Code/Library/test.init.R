@@ -12,7 +12,7 @@ test.init <- function(dat) {
     hypox.p = inits$hypox.p[j]
     
     ############################################ factoring in hypoxia as a covariate ############################################ 
-    occ.full <- inv.logit(logit(occ) + hypox.p * dat)
+    occ.full <- inv_logit(logit(occ) + hypox.p * dat)
     
     # encounters [0 or 1]
     enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
@@ -34,8 +34,8 @@ test.init <- function(dat) {
   	transformed parameters{
   		real<lower=0,upper=1> occ; // occupancy
   		real<lower=0,upper=1> det; // detection
-  		occ = inv.logit(logit_occ);
-  		det = inv.logit(logit_det);
+  		occ = inv_logit(logit_occ);
+  		det = inv_logit(logit_det);
   	}
   	model{
   	  // storage
@@ -100,9 +100,9 @@ sum <- summary(occ.stan)
       inits$hypox.p_bias[j] <- NA;
    }else{
      # when sufficient --> report posterior values
-      inits$occ_bias[j] <-abs(sum$summary[1, 1] - inits$occ[j]) / sum$summary[1, 1] * 100;
-      inits$det_bias[j] <- abs(sum$summary[2, 1] - inits$det[j]) / sum$summary[2, 1] * 100;
-      inits$hypox.p_bias[j] <- abs(sum$summary[3, 1] - inits$hypox.p[j]) / sum$summary[3, 1] * 100;
+      inits$occ_bias[j] <-(sum$summary[1, 1] - inits$occ[j]) / sum$summary[1, 1] * 100;
+      inits$det_bias[j] <- (sum$summary[2, 1] - inits$det[j]) / sum$summary[2, 1] * 100;
+      inits$hypox.p_bias[j] <- (sum$summary[3, 1] - inits$hypox.p[j]) / sum$summary[3, 1] * 100;
     }
   } #end fxn for loop
   return(inits)
