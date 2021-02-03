@@ -10,10 +10,8 @@ require("knitr")
 opts_knit$set(root.dir = "~/Box Sync/McLeod_thesis/code")
 ```
 
-
 # load packages
 ```{r}
-#setwd("~/Box Sync/McLeod_thesis/code")
 require(rstan)
 require(bayesplot)
 require(shinystan)
@@ -22,16 +20,15 @@ require(purrr)
 require(readxl)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-
 ```
 
 # input simulated data and functions
 ```{r}
-load("../Data/DO_sims.Rdata")
-good_yr <- DsD[DsD$Year == 2015,5] #high DO levels
-bad_yr <- DsD[DsD$Year == 2018,5] #low DO levels
+load("DO_sims.Rdata")
+load("DO_sims_New.Rdata")
+good_year <- DsD[DsD$Year == 2015,5] #high DO levels
+bad_year <- DsD[DsD$Year == 2018,5] #low DO levels
 
-source("./Library/test.init.R")
 source("./Library/logit.R")
 source("./Library/inv.logit.R")
 ```
@@ -46,24 +43,225 @@ inits$hypox.p_bias <- rep(NA, nrow(inits))
 
 ```
 
+
+# updated with timeseries simulations 
+```{r}
+test.init <- function(dat) {
+  N = ncol(dat)
+  for (j in 1:nrow(inits)){
+   
+    occ = inits$occ[j]
+    det = inits$det[j]
+    hypox.p = inits$hypox.p[j]
+    
+    # space for timeseries simulations 
+    simz <- matrix(0, nrow = nrow(dat), ncol = 3)
+    for (s in 1:nrow(dat)){
+    #################################### factoring in hypoxia as a covariate ############################################ 
+    occ.full <- inv_logit(logit(occ) + hypox.p * dat[s,])
+    
+    # encounters [0 or 1]
+    enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
+    
+    ###############################################  STAN MODEL  ############################################ 
+    occ.mod2 <- "
+  	data{
+  		int<lower=1> N; //number of samples
+  		int<lower=0> enc[N]; //encounters
+  		vector[N] hypox; //hypoxia
+  		vector[3] prior_mu;
+  		vector[3] prior_sd;
+  	}
+  	parameters{
+  		real logit_occ;
+  		real logit_det;
+  		real hypox_p; //hypoxia slope
+  	}
+  	transformed parameters{
+  		real<lower=0,upper=1> occ; // occupancy
+  		real<lower=0,upper=1> det; // detection
+  		occ = inv_logit(logit_occ);
+  		det = inv_logit(logit_det);
+  	}
+  	model{
+  	  // storage
+  	    vector[N] occ_eff;
+  
+  	  // weakly informative priors
+  		logit_occ ~ normal(prior_mu[1],prior_sd[1]);
+  		logit_det ~ normal(prior_mu[2],prior_sd[2]);
+  		hypox_p ~ normal(prior_mu[3],prior_sd[3]);
+  
+  	// likelihoods
+  		for(i in 1:N){
+  			occ_eff[i] = logit_occ + hypox_p*hypox[i];
+  			if(enc[i] > 0){
+  				//the site was occupied, and you detected it
+  				target += log_inv_logit(occ_eff[i]) + bernoulli_logit_lpmf(1| logit_det );
+  				
+  			}else{
+  				//the site was occupied but you didn't detect it & the site was unoccupied
+  				target += log_sum_exp(log_inv_logit(occ_eff[i]) + bernoulli_logit_lpmf(0| logit_det), log1m_inv_logit(occ_eff[i]));
+  			}
+  		}
+  	}"
+    # target as a vector then take sum of all values for occupied and non-occupied. 
+    
+    ###############################  Creating data in list format necessary for Stan ####################################
+    occ.stan.dat <- list(N = N,
+                         enc = enc,
+                         hypox = dat[s,],
+                         prior_mu = c(0, logit(det), 0),
+                         prior_sd = c(1,1,1)) #flatter- 1
+
+occ.stan <- stan(model_code = occ.mod2,
+             pars = c('occ','det','hypox_p','logit_det','logit_occ'),
+             data = occ.stan.dat,
+             chains = 4,
+             warmup = 2000,
+             iter = 6000,
+             control = list(adapt_delta = 0.95)) 
+# cores 16
+# move to script 
+ 
+sum <- summary(occ.stan)
+
+  # Create if else statement of convergence using rhat > 1.05 to eliminate posteriors that do not converge
+  x <- rep(0, nrow(sum$summary))
+    for(n in 1: nrow(sum$summary)){
+      # insufficient rhat >=1.05
+      if(sum$summary[n, 10] >= 1.05){
+        x[n] = NA
+        x <- x[is.na(x)]
+      } 
+      #insufficient effect size <= 100
+      if(sum$summary[n, 9] <= 100){
+        x[n] = NA
+        x <- x[is.na(x)]
+      }
+    } #end small for loop
+  
+     if(is.na(x)){
+        simz[s,] <- rep(NA, 3)
+     }else{
+       simz[s,] <- c(sum$summary[1, 1], sum$summary[2, 1], sum$summary[3, 1])
+     }
+    }
+    ### DO WE WANT THIS OR DO WE WANT TO CALCULATE THE BIAS AT EACH SIMULATION AND THEN TAKE THE SUM OF THOSE BIASES????
+    Sim_sum <- colSums(simz)
+    # bias here & store bias / sd of the posterior 
+    
+    ##HOW DO WE WANT TO TAKE CARE OF DIVERGENCE FOR SOME SIMULATIONS OF A PRIOR? 
+  # when insufficient --> make NA
+    if(is.na(Sim_sum)){
+      inits$occ_bias[j] <- NA;
+      inits$det_bias[j] <- NA;
+      inits$hypox.p_bias[j] <- NA;
+   }else{
+     # when sufficient --> report posterior values
+      inits$occ_bias[j] <-(sum$summary[1, 1] - inits$occ[j]) / sum$summary[1, 1] * 100;
+      inits$det_bias[j] <- (sum$summary[2, 1] - inits$det[j]) / sum$summary[2, 1] * 100;
+      inits$hypox.p_bias[j] <- (sum$summary[3, 1] - inits$hypox.p[j]) / sum$summary[3, 1] * 100;
+      #bias and sd 
+   }
+  } #end fxn for loop
+  return(inits)
+} # end fxn
+
+```
+
 # Test values and report bes results
 ```{r}
-inits_good <- test.init(good_yr)
-inits_bad <- test.init(bad_yr)
+inits_gd <- test.init(good_yr$Sim_DO_matrix)
+inits_bd <- test.init(bad_yr$Sim_DO_matrix)
+
+### check for smallest values of bias
+inits_sm_g <- inits_gd %>% 
+  filter(occ_bias < 50) %>% 
+  filter(det_bias < 50) %>% 
+  filter(hypox.p_bias < 50) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
+
+inits_sm_b <- inits_bd %>% 
+  filter(occ_bias < 50) %>% 
+  filter(det_bias < 50) %>% 
+  filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd] then .75/.5/1
+save(inits_sm_b, inits_sm_g, file= "DO_inits_sims.Rdata")
+```
+
+
+```{r}
+source("./Library/test.init.R")
+inits_good <- test.init(good_year)
+inits_bad <- test.init(bad_year)
 
 ### check for smallest values of bias
 inits_sm_g <- inits_good %>% 
-  filter(occ_bias < 40) %>% 
-  filter(det_bias < 40) %>% 
-  filter(hypox.p_bias < 40) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
+  filter(occ_bias < 50) %>% 
+  filter(det_bias < 50) %>% 
+  filter(hypox.p_bias < 50) #0.75/.25/1 -- .75 /.5 /1 -- 0.75/.75/1 [1st - 2nd - 3rd]
 
 inits_sm_b <- inits_bad %>% 
   filter(occ_bias < 50) %>% 
   filter(det_bias < 50) %>% 
   filter(hypox.p_bias < 50) #0.75/.75/1 -- .25 /.25 /1 -- 0.75/.25/1 [1st - 2nd - 3rd] then .75/.5/1
 
-save(inits_sm_g, inits_sm_b, file= "inits_bias.Rdata")
 ```
+
+
+# new Stan model to account for counts?
+```{r}
+occ.mod3 <- "
+  data {
+  int<lower=1> S;                 // Number of sites
+  int<lower=1> N;                 // Number of temporal replications
+  int<lower=0, upper=1> y[S, N];   // Observation
+}
+
+transformed data {
+  int<lower=0,upper=N> sum_y[S];  // Number of detections for each site
+  int<lower=0,upper=S> occ_obs;   // Number of observed occupied sites
+
+  occ_obs = 0;
+  for (i in 1:S) {
+    sum_y[i] = sum(y[i]);
+    if (sum_y[i])
+      occ_obs = occ_obs + 1;
+  }
+}
+
+parameters {
+  real<lower=0,upper=1> occ;      // Occupancy probability
+  real<lower=0,upper=1> det;        // Detection probability
+}
+
+model {
+  // Priors
+  // Flat priors are implicitly used on occ and p.
+
+  // Likelihood
+  for (i in 1:S) {
+    if (sum_y[i]) {    // Occurred and observed
+      1 ~ bernoulli(occ);
+      y[i] ~ bernoulli(det);
+    } else {
+       // Occurred and not observed
+      target += log_sum_exp(bernoulli_lpmf(1 | occ) + bernoulli_lpmf(0 | det) * N,
+      // Not occurred
+       bernoulli_lpmf(0 | occ));
+    }
+  }
+}
+generated quantities {
+  int<lower=occ_obs, upper=S> occ_fs;
+  real occ_nd;  // prob occurred given not detected
+  
+  occ_nd = (occ * (1 - det)^N) / (occ * (1 - det)^N + (1 - occ));
+  occ_fs = occ_obs + binomial_rng(S - occ_obs, occ_nd);
+}" 
+ 
+```  
+
+
 
 # REMOVE IF DONT USE
 ```{r}
