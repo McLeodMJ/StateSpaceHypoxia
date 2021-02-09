@@ -75,10 +75,17 @@ zz <- Total_sp_data %>%
   filter(common_name == c("Dover sole", "greenstriped rockfish", "lingcod", "yellowtail rockfish"))
 
 # sp. density per trawl 
-zzz <- zz %>% 
+x <- zz %>% 
   group_by(trawl_id, common_name) %>% 
   summarise(density = n()) 
 
+#record hypoxia per trawl
+ xx <- Total_sp_data %>% 
+    group_by(trawl_id, Date) %>% 
+    summarise(mean_hyp = mean(o2_at_gear_ml_per_l_der))
+  
+ zzz <- inner_join(xx, x) 
+ 
 # set species as level to report them each time
 zzz$common_name <- as.ordered(zzz$common_name)
 levels(zzz$common_name) = c("Dover sole", "greenstriped rockfish", "lingcod", "yellowtail rockfish")
@@ -87,14 +94,17 @@ levels(zzz$common_name) = c("Dover sole", "greenstriped rockfish", "lingcod", "y
 all <- zzz %>% 
 expand(trawl_id, common_name)
 
+
 # join all posibilties to df
 z <- zzz %>% dplyr::right_join(all)
+z <- z %>% fill(Date:mean_hyp)
 z$Presence <- ifelse(is.na(z$density), 0, 1) #present/ absent 
 z$density <- ifelse(is.na(z$density), 0, z$density) # 0 for no observation
 
 #Reorder by date
   index <- with(z, order(trawl_id, common_name)) #organizes by month then year
   Spe_present <- z[index,]
+  
   
 save(list= c("Grock", "Yrock", "Lingcod", "Dsole", "Spe_present") ,file= "../Data/Groundfish.Hyp.Rdata")
 ```
@@ -220,6 +230,13 @@ summary(Grock.lm)
 plot(allEffects(Grock.lm))
 
 plot(Grock$year, resid(Grock.lm)) #poor fit
+
+```
+
+# binomial w/ presence& absence 
+```{r}
+GRhyp_pres.glm <- glm(Presence ~ -1 + Hypoxia, data = Spe_present, family = binomial)
+plot(allEffects(GRhyp_pres.glm))
 
 ```
 
