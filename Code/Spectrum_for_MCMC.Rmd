@@ -158,7 +158,6 @@ spec.yr <- function(dat, yr){
   }
   # make negative simDO = 0
 # Sim_DO[ Sim_DO[,2] < 0] = 0
-
  
   Sim_DO$signif <- signif
   Sim_DO$dt2 <- Dt2
@@ -171,6 +170,8 @@ spec.yr <- function(dat, yr){
 }
   good_yr <- spec.yr(dat_NA, 2015)
   bad_yr <- spec.yr(dat_NA, 2018)
+  save(good_yr, bad_yr, file= "DO_sims_New.Rdata")
+  View(good_yr$Sim_DO_matrix)
 ```
   
   
@@ -179,7 +180,7 @@ spec.yr <- function(dat, yr){
 ```{r}
   # Now do the FFT
   f <- seq(from=0, to=0.5, length.out = ceiling(nrow(bad_yr) / 2)) # vector of frequencies
-  F0 <- abs((fft(bad_yr$dt2[1:nrow(bad_yr)/10]) ) ) / length(bad_yr$dt2[1:nrow(bad_yr)/10])
+  F0 <- abs((fft(bad_yr$dt2[1:nrow(bad_yr)/N]) ) ) / length(bad_yr$dt2[1:nrow(bad_yr)/N])
   F0 = F0[1:length(f)]
   Freq <- abs((fft(bad_yr$DO) ) ) / length(bad_yr$DO)
   Freq = Freq[1:length(f)]
@@ -188,7 +189,7 @@ spec.yr <- function(dat, yr){
  fft_sims <- do.call(data.frame,lapply(fft_sims, function(x) replace(x, is.infinite(x),NA)))
   fft_sims <- na.omit(fft_sims)
   
-  # simulated data for 10-yrs (these are shown as continuous but really gap in ts for off-season months)
+  # simulated data for 100-yrs (these are shown as continuous but really gap in ts for off-season months)
   bad <- ggplot(bad_yr, aes(time, DO))+
            geom_line(alpha=0.7) +
           labs(title= "Low DO")
@@ -276,7 +277,6 @@ return(DsD)
 
 DsD <- rbind(spec.yr(dat_NA, 2015), spec.yr(dat_NA, 2018))
 colnames(DsD) <- c("Year", "Period", "Freq_sq", "Signf", "Sim_DO")
-setwd("~/Box Sync/McLeod_thesis/code")
 save(DsD, file= "DO_sims.Rdata")
 # divide x by 10 -x axis by days
 
