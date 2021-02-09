@@ -3,14 +3,21 @@
 # dat = good_yr or bad_yr (DO simulations - drawn from 'Data' folder)
 #########################################################################################
 
-test.init <- function(dat) {
+test.init <- function(dat, tru) {
+  start_time <- paste('Start time: ', Sys.time(), ' - ', dat, ' - ', 
+                      tru, sep = '')
+  write(start_time, file = 'progress.txt', append = TRUE)
+  
   N = ncol(dat)
   simz_list <- list()
-  for (j in 1:nrow(inits)){
+  
+  #default return as list
+  #foreach (j = 1:nrow(tru)) %dopar% {
+  for (j in 1:nrow(tru)){
     
-    occ = inits$occ[j]
-    det = inits$det[j]
-    hypox.p = inits$hypox.p[j]
+    occ = tru$occ[j]
+    det = tru$det[j]
+    hypox.p = tru$hypox.p[j]
     
     # df for timeseries simulations 
     simz <- data.frame(occ = rep(occ, nrow(dat)),
@@ -85,7 +92,7 @@ test.init <- function(dat) {
                            prior_sd = c(10, 10, 10)) #flatter- 1
       
       occ.stan <- stan(model_code = occ.mod2,
-                       pars = c('occ','det','hypox_p','logit_det','logit_occ'),
+                       pars = c('occ','det','hypox_p'),
                        data = occ.stan.dat,
                        chains = 4,
                        warmup = 2000,
@@ -114,11 +121,18 @@ test.init <- function(dat) {
       simz$occ_sd[s] <- sum$summary[1, 3]
       simz$det_sd[s] <- sum$summary[2, 3]
       simz$hypox.p_sd[s] <- sum$summary[3, 3]
+      
+      
+      if (s %% 10 == 0) {
+        update <- paste(Sys.time(), ' - ', dat, ' - ', s, '% done!', sep = '')
+        write(update, file = 'progress.txt', append = TRUE)
+      }
+      
     } #end s for loop
     simz_list[[j]] <- simz 
     
   } #end j for loop
   
-  return(simz_list)
+  save(simz_list, file= paste('~/Documents/name_of_folder/Simz_list', dat, '.Rda', sep=''))
+  
 } #end fxn
-
