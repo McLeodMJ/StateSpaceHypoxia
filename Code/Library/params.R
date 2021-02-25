@@ -10,11 +10,12 @@ params <- function(sp){
   # Female Parameters
   if(sp == "Dsole"){
    Params <- list(
+     name = "Dsole",
     R0 = 12.85,  #unfished R0 - ln(r0) or # 380777 recruits
     R0.sd = 0.35, #fixed
     steep = 0.8, 
     S0 = 469866,
-    f = 0.017,
+    f = 0.04, #hybrid page 315
     fec.const = 0.000002805, #linear to weight
     fec.exp = 3.345,
     fec.int =1, #1
@@ -35,18 +36,19 @@ params <- function(sp){
   # Parameters from Northern model & Female
  if(sp == "Lingcod"){
     Params <- list( 
+      name = "Lingcod",
       R0 = 9.0669, #ln(r0) // #8037
       R0.sd = 0.16454, #have 95% CI
       steep = 0.7,
       S0 = 37974, #unit is mt
-      f = 0.115,
+      f = 0.117, #webplot digit page 238
       fec.const = 0.00000276,
       fec.exp = 3.28,
       fec.int =1,
       fec.slp = 3,
       M = 0.257,
       M.sd = 0.4384,
-      K = 0.0173,
+      K = 0.1283,#page 97
       K.sd = NA,
       Linf = 108.6,
       Linf.cv = 0.06,
@@ -60,12 +62,13 @@ params <- function(sp){
   # Female parameters
  if(sp == "Grock"){
     Params <- list( 
+      name = "Grock",
       R0 = 9.62,# - ln(R0) // 15041 recruits
       R0.sd = 0.15, # 95 CI: 2073-109,131
       steep = 0.69,
-      S0 = 7090,
-      f = 0.0682, #exploitation rate: SPR(msy)
-      fec.const = 371200, #fec. intercept
+      S0 = 37947,
+      f = 0.1, #pope page 228 
+      fec.const = 371200, #fec. intercept PAGE 17 & 54
       fec.exp = 63300, #fec. slope
       fec.int =1, #1 
       fec.slp = 3, #0 p#207
@@ -85,11 +88,12 @@ params <- function(sp){
   # Parameters from Northern model & Female
  if(sp == "Yrock"){
     Params <- list( 
+      name = "Yrock",
       R0 = 10.83, # ln(R0) // 49090000 recruits
       R0.sd = 0.15, #95 ci: 17.86-134.94 mil
       steep = 0.718,
       S0 = 14.996, #trillion eggs
-      f = 0.089, #95 CI: 0.085-0.093
+      f = 0.0008, ## 2004 SA page 5 for 2005
       fec.const = 1.1185e-11,
       fec.exp = 4.59,
       fec.int =1, #0
@@ -107,3 +111,9 @@ params <- function(sp){
    }
   return(Params)
 }
+
+
+
+
+# north model for lingcod and yellowtail 
+# all female parameters
