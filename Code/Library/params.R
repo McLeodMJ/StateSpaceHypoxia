@@ -93,7 +93,7 @@ params <- function(sp){
       R0.sd = 0.15, #95 ci: 17.86-134.94 mil
       steep = 0.718,
       S0 = 14.996, #trillion eggs
-      f = 0.0008, ## 2004 SA page 5 for 2005
+      f = 0.01169, # page 22 exp. rate [ Andi Stephens confirmed 2/25/21 that it is pope's eqn & recorde as exp.]
       fec.const = 1.1185e-11,
       fec.exp = 4.59,
       fec.int =1, #0
