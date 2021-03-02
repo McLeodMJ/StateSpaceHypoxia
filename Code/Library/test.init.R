@@ -4,12 +4,12 @@
 #########################################################################################
 
 test.init <- function(dat, tru) {
-  start_time <- paste('Start time: ', Sys.time(), ' - ', dat, ' - ', 
-                      tru, sep = '')
+  start_time <- paste('Start time: ', Sys.time(), ' - ', dat, ' - ', tru, sep = '')
   write(start_time, file = 'progress.txt', append = TRUE)
   
   N = ncol(dat)
   simz_list <- list()
+  model <- stan_model(occ.mod1)
   
   #default return as list
   #foreach (j = 1:nrow(tru)) %dopar% {
@@ -33,6 +33,7 @@ test.init <- function(dat, tru) {
                        hypox.p_bias = rep(0, nrow(dat)),
                        hypox.p_sd = rep(0, nrow(dat)) )
     
+   
     #################################### factoring in hypoxia as a covariate ############################################
     for (s in 1:nrow(dat)){
       occ.full <- inv_logit(logit(occ) + hypox.p * dat[s,])
@@ -40,77 +41,51 @@ test.init <- function(dat, tru) {
       # encounters [0 or 1]
       enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
       
-      ###############################################  STAN MODEL  ############################################ 
-      occ.mod2 <- "
-    	data{
-    		int<lower=1> N; //number of samples
-    		int<lower=0> enc[N]; //encounters
-    		vector[N] hypox; //hypoxia
-    		vector[3] prior_mu;
-    		vector[3] prior_sd;
-    	}
-    	parameters{
-    		real logit_occ;
-    		real logit_det;
-    		real hypox_p; //hypoxia slope
-    	}
-    	transformed parameters{
-    		real<lower=0,upper=1> occ; // occupancy
-    		real<lower=0,upper=1> det; // detection
-    		occ = inv_logit(logit_occ);
-    		det = inv_logit(logit_det);
-    	}
-    	model{
-    	  // storage
-    	    vector[N] occ_eff;
-    
-    	  // weakly informative priors
-    		logit_occ ~ normal(prior_mu[1],prior_sd[1]);
-    		logit_det ~ normal(prior_mu[2],prior_sd[2]);
-    		hypox_p ~ normal(prior_mu[3],prior_sd[3]);
-    
-    	// likelihoods
-    		for(i in 1:N){
-    			occ_eff[i] = logit_occ + hypox_p*hypox[i];
-    			if(enc[i] > 0){
-    				//the site was occupied, and you detected it
-    				target += log_inv_logit(occ_eff[i]) + bernoulli_logit_lpmf(1| logit_det );
-    				
-    			}else{
-    				//the site was occupied but you didn't detect it & the site was unoccupied
-    				target += log_sum_exp(log_inv_logit(occ_eff[i]) + bernoulli_logit_lpmf(0| logit_det),       log1m_inv_logit(occ_eff[i]));
-    			}
-    		}
-    	}"
-      # target as a vector then take sum of all values for occupied and non-occupied. 
-      
-      ###############################  Creating data in list format necessary for Stan ####################################
+ ###############################  Creating data in list format necessary for Stan ####################################
       occ.stan.dat <- list(N = N,
                            enc = enc,
                            hypox = dat[s,],
                            prior_mu = c(0, logit(det), 0),
                            prior_sd = c(10, 10, 10)) #flatter- 1
       
-      occ.stan <- stan(model_code = occ.mod2,
-                       pars = c('occ','det','hypox_p'),
-                       data = occ.stan.dat,
-                       chains = 4,
-                       warmup = 2000,
-                       iter = 6000,
-                       control = list(adapt_delta = 0.95)) 
-      sum <- summary(occ.stan)
       
+  ###############################################  STAN MODEL  ############################################ 
+#occ.stan <- stan(model_code = Occ.mod,
+#           pars = c('occ','det','hypox_p'),
+#           data = occ.stan.dat,
+#           chains = 4,
+#           cores = 4,
+#           warmup = 2000,
+#           iter = 8000,
+#           control = list(adapt_delta = 0.95))
+     
+      fit <- sampling(object = model, 
+                      data = occ.stan.dat,
+                      chains = 4, 
+                      cores = 4,
+                      iter = 8000, 
+                      warmup = 2000,
+                      control = list(adapt_delta = 0.90))
+   
       
-      # my fxn to check if rhat is too large or effect size too small 
-      x <- rep(0, nrow(sum$summary))
-      x <- convr.chk(sum$summary, x)
+      sum <- as.data.frame( summary(fit)$summary )
       
-      # convergence detected -> report as NA   
-      if(is.na(x)){
-        simz[s,4:6] <- rep(NA, 3)
-      }else{
-        simz[s,4:6] <- c(sum$summary[1, 1], sum$summary[2, 1], sum$summary[3, 1])
-      }
+      # my janky for loop to check if rhat is too large or effect size too small 
+      x <- rep(0, nrow(sum))
+      for(n in 1: nrow(sum)){
+        # insufficient rhat >=1.05 & effect size <100
+        if(sum$Rhat[n] >= 1.05 | sum$n_eff[n] <= 100) {
+          x[n] <- NA
+          } }
+        x <- na.omit(x) # adjusts length for next ifelse statement 
+        
+       if(length(x) < nrow(sum)) {
+          #insufficient 
+          simz[s,4:6] <- rep(NA, 3)
+        }else{
+          #sufficient 
+          simz[s,4:6] <- c(sum$mean[4], sum$mean[5], sum$mean[6])
+        }
       
       # calculate bias
       simz$occ_bias[s] <-  (simz$occ_post[s] - occ) / simz$occ_post[s]
@@ -118,21 +93,22 @@ test.init <- function(dat, tru) {
       simz$hypox.p_bias[s] <- (simz$hypox.p_post[s] - hypox.p) / simz$hypox.p_post[s]
       
       # retrieve the SD 
-      simz$occ_sd[s] <- sum$summary[1, 3]
-      simz$det_sd[s] <- sum$summary[2, 3]
-      simz$hypox.p_sd[s] <- sum$summary[3, 3]
-      
-      
-      if (s %% 10 == 0) {
-        update <- paste(Sys.time(), ' - ', dat, ' - ', s, '% done!', sep = '')
-        write(update, file = 'progress.txt', append = TRUE)
-      }
+      simz$occ_sd[s] <- sum$sd[1]
+      simz$det_sd[s] <- sum$sd[2]
+      simz$hypox.p_sd[s] <- sum$sd[3]
       
     } #end s for loop
     simz_list[[j]] <- simz 
     
+    
   } #end j for loop
+  if (j %% 2 == 0) {
+    update <- paste(Sys.time(), ' - ', dat, ' - ', j/24*100, '% done!', sep = '')
+    write(update, file = 'progress.txt', append = TRUE)
+  }
   
-  save(simz_list, file= paste('~/Documents/name_of_folder/Simz_list', dat, '.Rda', sep=''))
-  
+  save(simz_list, file= "Simz_list.Rdata")
+  #save(simz_list, file= paste('~/Documents/MCMC/Library/Simz_list', name, '.Rda', sep=''))
+
 } #end fxn
+
