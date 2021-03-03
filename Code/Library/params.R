@@ -29,7 +29,9 @@ params <- function(sp){
     Rlen = 5.405,
     Rlen.sd = 0.094 * 5.405, 
     Mat.len = 35,  #p. 34
-    Mat.slp = -0.775)# page 314
+    Mat.slp = -0.775, # page 314
+    selc.50 = 35,  # pg.35 length at 50% mature
+    selc.100 = 50) # page 100 figure 26
     
   }
   
@@ -55,7 +57,9 @@ params <- function(sp){
       Rlen = 17.2792,
       Rlen.sd = 0.1436 * 17.28, #cv-length min * mean #page 97
       Mat.len = 56.7, # p. 97 but 64 on #page 30
-      Mat.slp = -0.269) #p.97
+      Mat.slp = -0.269, #p.97
+      selc.50 = 56.63,  # p. 40
+      selc.100 = 140) # pg 233 figure 110
     
   }
   
@@ -81,7 +85,9 @@ params <- function(sp){
       Rlen = 9.25,#page 74
       Rlen.sd = 0.09 * 9.25, #cv given
       Mat.len = 20.97 ,  #p. 207
-      Mat.slp = -0.66) #p. 207
+      Mat.slp = -0.66, #p. 207
+      selc.50 = 21,# p. 68 L50%
+      selc.100 = 28) # p. 68 L100%
     
   }
   
@@ -107,7 +113,9 @@ params <- function(sp){
       Rlen = 14.689,#page 80
       Rlen.sd = 0.105 * 14.689,# given as cv
       Mat.len = 42.49,  #p. 80
-      Mat.slp = -0.401) #guess
+      Mat.slp = -0.401,
+      selc.50 = 42.49, # page 30
+      selc.100 = 53.58) #page 80
    }
   return(Params)
 }
