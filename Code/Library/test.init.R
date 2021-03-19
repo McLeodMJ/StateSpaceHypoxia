@@ -65,7 +65,7 @@ test.init <- function(dat, tru) {
                       cores = 4,
                       iter = 8000, 
                       warmup = 2000,
-                      control = list(adapt_delta = 0.90))
+                      control = list(adapt_delta = 0.99))
    
       
       sum <- as.data.frame( summary(fit)$summary )
@@ -84,7 +84,7 @@ test.init <- function(dat, tru) {
           simz[s,4:6] <- rep(NA, 3)
         }else{
           #sufficient 
-          simz[s,4:6] <- c(sum$mean[4], sum$mean[5], sum$mean[6])
+          simz[s,4:6] <- c(sum$mean[4], sum$mean[5], sum$mean[3])
         }
       
       # calculate bias
