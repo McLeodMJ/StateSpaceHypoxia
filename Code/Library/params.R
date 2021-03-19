@@ -31,7 +31,8 @@ params <- function(sp){
     Mat.len = 35,  #p. 34
     Mat.slp = -0.775, # page 314
     selc.50 = 35,  # pg.35 length at 50% mature
-    selc.100 = 50) # page 100 figure 26
+    selc.100 = 50, # page 100 figure 26
+    depl = 0.837) #page 7
     
   }
   
@@ -59,7 +60,8 @@ params <- function(sp){
       Mat.len = 56.7, # p. 97 but 64 on #page 30
       Mat.slp = -0.269, #p.97
       selc.50 = 56.63,  # p. 40
-      selc.100 = 140) # pg 233 figure 110
+      selc.100 = 140, # pg 233 figure 110
+      depl = 0.579) #page 8 in decimal of %
     
   }
   
@@ -87,7 +89,8 @@ params <- function(sp){
       Mat.len = 20.97 ,  #p. 207
       Mat.slp = -0.66, #p. 207
       selc.50 = 21,# p. 68 L50%
-      selc.100 = 28) # p. 68 L100%
+      selc.100 = 28, # p. 68 L100%
+      depl = 0.814) #page 8 in decimal of %
     
   }
   
@@ -110,16 +113,16 @@ params <- function(sp){
       K.sd = NA, #literature values used/ do not give SD
       Linf = 52.2,
       Linf.cv = 0.1, #do not give SD or CV - SD estimated at 0.1
-      Rlen = 14.689,#page 80
-      Rlen.sd = 0.105 * 14.689,# given as cv
+      Rlen = 14.689, #page 80
+      Rlen.sd = 0.105 * 14.689, # given as cv
       Mat.len = 42.49,  #p. 80
       Mat.slp = -0.401,
       selc.50 = 42.49, # page 30
-      selc.100 = 53.58) #page 80
+      selc.100 = 53.58, #page 80
+      depl = 0.752) #page 8 in decimal of %
    }
   return(Params)
 }
-
 
 
 
