@@ -1,105 +1,99 @@
 # Greenstriped rockfish 
 # Fishing rate is referred to as exploitation rate
+require(ggplot2)
+require(patchwork)
 
-source("params.R")
 
-# Here's that kernel function
-kernmat <- function(x, pars, timestep){
+source("Code/Library/params.R")
+source("./Library/kernmat.R")
+source("./Library/fecmat.R")
+
+
+fish <- c("Lingcod", "Yrock", "Grock", "Dsole")
+
+time = 1e2 #model runs in time
+df <- data.frame( Time = rep(c(50:time), 4), 
+                  Type = rep(fish, each = (length(50:time))),
+                  Pop.Size =  rep(NA, length(c(50:time)*4 )))
+
+
+for ( f in fish){
+  pars <- params(f)
+  # IPM integration parameters:
+    meshsize = 200
+    meshmin = 0
+    meshmax = pars$Linf * 2
+    
+    x <- seq(from = meshmin, to = meshmax, length.out = meshsize) # different size classes
+    dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* left rule
+    
+  ## size distribution of recruits
+    Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)  
+    
+  ## Kernel functions 
+    K1 <- kernmat(x, pars, 1)
+    Fe1<- fecmat(x, pars)
+    
+  ### Initialize the model:
+    N1 = matrix(0, nrow = meshsize, ncol = time) #pop size w/ growth/mortal kernel
+    N1[,1] <- Rvec * exp(pars$R0) # initialize with one pulse of new recruits
+    E1 <- NULL
+    Recruits1 <- NULL
+    
+  ### Run the model
+  for (t in 2:time){
+    N1[,t] <- K1 %*% N1[,t-1]  * dx  # midpoint rule integration
+    E1[t] <- Fe1 %*% N1[,t-1] * dx
+    
+  ### BH Recruitment 
+    # BH eqn: (Methot and Tylor 2011 - eqn A.7)
+      # Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
+    Recruits1[t] <- (4 * pars$steep * exp(pars$R0) * E1[t]) / ((pars$S0 * (1 - pars$steep)) + (E1[t] * (5 * pars$steep - 1)))
+    N1[,t] = N1[,t] + Recruits1[t] * Rvec # + rnorm()*process noise 
+    # Y[,t] = rnorm()*observation error
+  } #end of model
   
-  #' create a mesh grid of size changes
-   X = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t
-   Y = t(X) #- matrix of sizes at t+1
-  
-  # Survival part of kernel
-  # m= pars$m
-  m=0  #check with mort. =0 - # should be dist. around Linf
-  
-  
-  ### decreases with size class
+   N01 <- N1[,time] # save SAD
+   
+   ### Run the model WITH variation
+   Nv1 = matrix(0, nrow = meshsize, ncol = time)
+   Nv1[,1] <- N01 #initalize with SAD
+   E1 <- NULL
+   Recruits1 <- NULL
+   cv = 0.1 # coef. of variation to introduce noise around recruitment 
+   
+   for (t in 2:time){
+     Nv1[,t] <- K1 %*% Nv1[,t-1]  * dx  # midpoint rule integration
+     E1[t] <- Fe1 %*% Nv1[,t-1] * dx 
 
-  # convert to probability
-  pm <- exp(-m * timestep) # prob. survival
-  ### increases with size
-  
-  # Growth part of kernel. Do it this way so that we simulate many different growth trajectories in the population, averaged together.
-  nLinfs = 1000 # how many different values of Linf to simulate
-  Len_sims <- array(rep(NA, nLinfs * length(x) * length(x)), c(nLinfs, length(x), length(x)))
-  
-  Linfs <- rnorm(n = nLinfs, mean = pars$Linf, sd = pars$Linf.sd) # vector of distribution of Linfs
-  Len_sims[,,1] <- matrix(Linfs, nrow = nLinfs, ncol = length(x)) # expand into a matrix so there is a corresponding value of Linf for each possible value in the length vector x
-  Len_sims[,1,] <- t(matrix(x, ncol = nLinfs, nrow = length(x))) # expand x into a matrix so there is a value for each value of Linfs.mat
+     Recruits1[t] <- (4 * pars$steep * exp(pars$R0) * E1[t]) / ((pars$S0 * (1 - pars$steep)) + (E1[t] * (5 * pars$steep - 1)))
+     RR <- exp(rnorm(1, mean = log(Recruits1[t]) - ((cv * log(Recruits1[t]))^2)/2, sd= cv * log(Recruits1[t]) ))# change cv to 0 for no variation
+     Nv1[,t] = Nv1[,t] + Recruits1[t] * Rvec * RR  
+   }
+   # lognormal variation - 
+   
+   pop <- colSums(Nv1[ ,50:time])
+   df[df$Type == f, 3] <- pop
+   #plot(pop, type='l')
 
-  g.tmp <-  Len_sims[,,1] - (Len_sims[,,1] - Len_sims[,1,]) * exp(-pars$k * timestep) # use those two matrices to get the range of possible growth rates, as a function of X
-  g.mean <- colMeans(g.tmp) # Take the mean across all of the different trajectories for each value of x
-  Len_sims[1,,] <- t(matrix(g.mean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
-  pg <- dnorm(Y, mean = Len_sims[1,,], sd = 2 * dx) # use dnorm to get the distribution of growth rates (using an arbitrarily small sd)
-  
-  
-  # make sure no negatives
-  pg[pg<0] = 0
-  pm[pm<0] = 0 
-  
-  # you would add fecundity here if it were a closed population...
-  k = pm*pg
-  # get the diagonal growth pattern
-  
-  # If adding fecundity too:
-  #Rvec = dnorm(Y, pars$rec, pars$rec.sd) # size distribution of recruits
-  #Fec = pars$fec.const * X ^pars$fec.exp # you can use values of 1 and 3 for these... 
-  #Q = Fec * Rvec # combine the two
-  #k = k + Q # add in fecundity to the growth/survival part
-  
-  
-  return(k)
-}
+} #end of f loop
+#df$Pop.Size <- scale(df$Pop.Size) #noramlize data
 
-#------------------------------------------------------------------
-# Build IPM...
+d <- ggplot(df[df$Type =="Dsole", ], aes(Time, Pop.Size))+
+  geom_line(colour = "steelblue")+
+  labs(title= "Dover Sole Model Simulations", y= "Dover Sole Biomass")
 
-# Create parameters:
-pars <- params("Grock")
-  #list(k = 0.105, Linf = 33.67, Lvar = 0.14/33.67, Rmu = 10, # Lvar is CV of Linf (SD/mean)
-             # Rmean = 9.65, Rsd = 0.15, mort= 0.0682) #, Fec_constant = 1, Fec_exponent = 3) # mean & sd of size of new recruits
+l <- ggplot(df[df$Type =="Lingcod", ], aes(Time, Pop.Size))+
+  geom_line(color = "salmon1")+
+  labs(title = "Lingcod Model Simulations", y="Lingcod Biomass")
 
-# rates per year 
-# linf cm
-# nat. mort - informative prior with life history  (max observed age - average water temp --> life history theory )
-# size of a new recruits - back estimate  - size at age 0 after von bertalnffy 
-# fishing rate 
-# variabilty in recruitment 
-# can we estimate the fishing rate getting info from edge while acccounting for hypoxia ?
+g <- ggplot(df[df$Type =="Grock", ], aes(Time, Pop.Size))+
+  geom_line(colour = "darkolivegreen")+
+  labs(title="Greenstriped Rockfish Model Simulations",  y="Greenstriped Rockfish Biomass")
 
+y <- ggplot(df[df$Type =="Yrock", ], aes(Time, Pop.Size))+
+  geom_line(colour = "yellow3")+
+  labs(title="Yellowtail Rockfish Model Simulations",  y="Yellowtail Rockfish Biomass")
 
-# IPM integration parameters:
-meshsize = 100
-meshmin = 0
-meshmax = pars$Linf * 2
-
-x <- seq(from = meshmin, to = meshmax, length.out = meshsize) # different size classes
-dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* left rule
-
-# Recruit size distribution
-Rvec <- dnorm(x, mean = pars$rec, pars$rec.sd)
-# this should integrate to unity (1) - does it?
-
-# Create the kernel
-K <- kernmat(x, pars, timestep = 1/36) # in 1/36 of a year time step
-plot(K, type='l')
-
-# Initialize the model:
-time = 1000
-N = matrix(0, nrow = meshsize, ncol = time)
-N[,1] <- Rvec # * pars$Rmu # initialize with one pulse of new recruits
-
-# Run the model
-for (t in 2:time){
-  N[,t] <- K %*% N[,t-1] * dx  +  Rvec # * pars$Rmu # midpoint rule integration
-}
-
-# total population size:
-sum(N[ ,time] * dx)
-
-
-plot(x, N[ ,time], type = 'l')
-plot(colSums(N) * dx)
+(l | g) / (y | d) #organize plots
 
