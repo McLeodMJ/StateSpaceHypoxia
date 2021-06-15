@@ -1,0 +1,181 @@
+---
+title: "fishing_rates"
+author: "Montana McLeod"
+date: "3/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "~/Documents/THESIS/StateSpaceHypoxia/Code")
+```
+
+
+```{r}
+require(ggplot2)
+require(GenKern)
+require(tidyverse)
+source("./Library/pre.params.R")
+source("./Library/fecmat.R")
+```
+
+# Create places to store objects
+```{r}
+fish <- c("Lingcod", "Yrock", "Grock", "Dsole") #species of interest
+fi <- seq(0, 0.4, length.out = 50) #various fishing rates
+time = 1e2 # model runs
+df2 <- data.frame(Species = rep(fish, each = length(fi)), 
+                  F.rate = rep(fi, length(fish)),
+                  Eggs =  rep(NA, length(fi) * length(fish)),
+                  SPR = rep(NA, length(fi) * length(fish)),
+                  Depletion = rep(NA, length(fi) * length(fish)))
+
+
+```
+
+
+# run the nested for loops over type of fish and different fishing rates
+```{r}
+for (f in fish){
+  pars <- pre.params(f)
+  
+  # IPM integration parameters:
+  meshsize = 200
+  meshmin = 0
+  meshmax = pars$Linf * 2
+  
+  x <- seq(from = meshmin, to = meshmax, length.out = meshsize) # different size classes
+  dx = diff(x)[1] #width of the 'rectangle' to do the midpoint rule *cough cough* left rule
+  
+  ## size distribution of recruits
+  Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)  
+  
+  ## Kernel functions 
+  Fe<- fecmat(x, pars)
+  
+  ############################################# Kernel with changing fishing rates #################################################
+    for( i in 1:length(fi)) {
+      ### create a mesh grid of size changes
+        Size_c = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
+      
+      ### selectivity eqn A.1.29 [appendix]
+      #S = 1 /1 + e(-log(19)(L-B1) / B2)
+      ## B1: len @50% female B2: diff btw len 95%-50% length at time t
+        selc <- 1/ (1 + exp(-log(19) * (x - pars$Rlen) / (pars$Linf - pars$Rlen)))
+      
+      #### Survival part of kernel
+      #m=0 #check with mort. =0 
+        m= pars$M + fi[i] * selc # natural and fishing
+      
+      ### convert to probability
+        timestep = 1 # 1yr
+        pm <- exp(-m * timestep) # prob. survival
+        # increases with size
+        pm[pm<0] = 0 # make sure no negatives 
+      
+      ### create a mesh grid of size changes
+        Size_r = t(Size_c) #- matrix of sizes at t+1 ## sizes same per row
+      
+      ################# Growth part of kernel ################
+        nLinfs = 1000 # how many different values of Linf to simulate
+      ### create Matrices of simulated sizes
+        Linfs <- rnorm(n = nLinfs, mean = pars$Linf, (pars$Linf.cv *pars$Linf)) # vector of random dist. of Linfs- max lengths
+        Linf_sims <- matrix(Linfs, nrow = nLinfs, ncol = length(x)) # expand into a matrix so there is a corresponding value of Linf for each possible value in the length vector x
+        # ^ same values for each column to run against different size distr.
+        Size_chge <- t(matrix(x, ncol = nLinfs, nrow = length(x))) # expand x into a matrix so there is a value for each value of Linfs.mat ## size changes per column and goes up to mesh max size 
+      
+      ### Create range of growth rates
+        VBlengths <-  Linf_sims - (Linf_sims - Size_chge) * exp(-pars$K * timestep) # VonBert -- use those two matrices to get the range of possible growth rates, as a function of X
+        
+        VBmean <- colMeans(VBlengths) # Take the mean across all of the different trajectories for each value of x
+        Leng_mean <- t(matrix(VBmean, nrow = length(x), ncol = length(x))) # expand into a matrix with a corresponding value for each value of Y (the size at time t+1)
+        
+        VBsd <- VBmean * (pars$Linf.cv)
+        Leng_sd <- t(matrix(VBsd, nrow = length(x), ncol = length(x))) 
+        
+      ### convert to probability 
+        pg <- dnorm(Size_r, mean = Leng_mean, sd = Leng_sd) # use dnorm to get the distribution of growth rates 
+        pg[pg<0] = 0 # make sure no negatives
+        
+      ### Run the kernel as prob. death * growth
+         K = pm * pg 
+  
+  
+  #####################################################################################################################
+  
+  ### Initialize the model:
+  N = matrix(0, nrow = meshsize, ncol = time) #pop size w/ growth/mortal kernel
+  N[,1] <- Rvec * exp(pars$R0) # initialize with one pulse of new recruits
+  E <- NULL
+  Recruits <- NULL
+  
+  ### Run the model
+      for (t in 2:time){
+        N[,t] <- K %*% N[,t-1]  * dx  # midpoint rule integration
+        E[t] <- Fe %*% N[,t-1] * dx
+        
+        ### BH Recruitment 
+        # BH eqn: (Methot and Tylor 2011 - eqn A.7)
+        # Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
+        Recruits <- (4 * pars$steep * exp(pars$R0) * E[t]) / ((pars$S0 * (1 - pars$steep)) + (E[t] * (5 * pars$steep - 1)))
+        N[,t] = N[,t] + Recruits * Rvec # + rnorm()*process noise 
+        # Y[,t] = rnorm()*observation error
+      } #end of model
+  
+    df2[df2$F.rate == fi[i] & df2$Species == f, 3 ] <- E[time]
+    } #end of fi.rate for loop
+  
+ df2[df2$Species ==f ,4] <- df2[df2$Species == f ,3] / max(df2[df2$Species == f, 3]) # take max eggs to get a proportional spr
+ exp.fi.rate <- max(df2[df2$Species == f, 4]) * pars$depl # max SPR times depletion 
+ df2[df2$Species ==f , 5] <- rep(exp.fi.rate, length(fi) ) # depletion 
+
+} #end of type of fish loop 
+  
+ ggplot(df2 , aes(x=F.rate, SPR, color= Species))+
+    geom_line()+
+    scale_fill_brewer(palette = "Accent")+
+    facet_wrap(~Species, scale = "free") 
+  #geom_hline(yintercept = mean(df2$Depletion), color= "yellow3", linetype= 2) #SPR 2016 year
+
+```
+
+# Plotting SPR with fishing rate
+```{r}
+# create df to call closest fishing rate based off depletion
+## depletion that is cloest to SPR is the fishing rate
+z<- df2 %>% 
+  group_by(Species) %>% 
+  mutate(zz = nearest(SPR, mean(Depletion))) %>% 
+  mutate(Exp.Frate = F.rate[zz])
+
+# average depletion
+Sp_depl <- z %>% 
+  select(Species, Depletion) %>% 
+  group_by(Species) %>% 
+  summarise(Depletion = mean(Depletion)) %>% 
+  arrange(Depletion)
+
+#AVERAGE expected fishing rate
+merge.to.data <- z %>% 
+  select(Species,  Exp.Frate ) %>% 
+  group_by(Species) %>% 
+  summarise(Exp.F.rate = mean(Exp.Frate)) %>% 
+  arrange(Exp.F.rate)
+
+# summary by spp. of depletion and fishing rate
+Sp_depl <- inner_join(Sp_depl, merge.to.data, by = 'Species')
+Sp_depl <- as.data.frame(Sp_depl)
+#save(Sp_depl, file= "./Results/Expected_Fishing_rate.Rdata")
+
+#includes expected fishing rate in each plot of SPR vs. Fishing rate
+ggplot(df2 , aes(x=F.rate, SPR, color= Species))+
+    geom_line()+
+    scale_fill_brewer(palette = "Accent")+
+    facet_wrap(~Species, scale = "free") +
+   geom_vline(aes(xintercept = Exp.F.rate), Sp_depl, color= "yellow3", linetype= 2) #SPR 2016 year
+
+```
+
+
+
+
