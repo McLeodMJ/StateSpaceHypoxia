@@ -11,17 +11,18 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Specimen
 ```{r}
-https://www.nwfsc.noaa.gov/data/api/v1/source/trawl.individual_fact/selection.csv?
+https://www.webapps.nwfsc.noaa.gov/data/api/v1/source/trawl.individual_fact/selection.csv?
   filters=project=Groundfish Slope and Shelf Combination Survey,
-year>2014,year<2016
+year>2009,year<2015
 &variables=project,
 trawl_id,
 operation_dim$operation_type,
 latitude_dd,
 longitude_dd,
 best_available_taxonomy_dim$grp_reg_depth_category,
-best_available_taxonomy_dim$order_40,scientific_name,c
-ommon_name,
+best_available_taxonomy_dim$order_40,scientific_name,
+common_name,
+sex,
 partition,
 length_cm,
 length_type,
