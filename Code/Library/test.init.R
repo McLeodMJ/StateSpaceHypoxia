@@ -3,11 +3,11 @@
 # dat = good_yr or bad_yr (DO simulations - drawn from 'Data' folder)
 #########################################################################################
 
-test.init <- function(dat, tru) {
+test.init <- function(dat, priors, tru) {
   start_time <- paste('Start time: ', Sys.time(), ' - ', dat, ' - ', tru, sep = '')
   write(start_time, file = 'progress.txt', append = TRUE)
   
-  N = ncol(dat)
+  N = ncol(dat) #N=length(dat) if solo try
   simz_list <- list()
   model <- stan_model(occ.mod1)
   
@@ -32,11 +32,11 @@ test.init <- function(dat, tru) {
                        det_sd = rep(0, nrow(dat)),
                        hypox.p_bias = rep(0, nrow(dat)),
                        hypox.p_sd = rep(0, nrow(dat)) )
-    
-   
+    #solo simz df
+   #simz <- data.frame(occ = rep(occ,1),det = rep(det,1),hypox.p = rep(hypox.p, 1),occ_post = rep(0, 1), det_post = rep(0, 1),hypox.p_post = rep(0,1),occ_bias = rep(0, 1)),occ_sd = rep(0,1),det_bias = rep(0, 1),det_sd = rep(0,1),hypox.p_bias = rep(0, 1),hypox.p_sd = rep(0, 1) )
     #################################### factoring in hypoxia as a covariate ############################################
     for (s in 1:nrow(dat)){
-      occ.full <- inv_logit(logit(occ) + hypox.p * dat[s,])
+      occ.full <- inv_logit(logit(occ) + hypox.p * dat[s,]) #solo = dat
       
       # encounters [0 or 1]
       enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)
@@ -44,9 +44,9 @@ test.init <- function(dat, tru) {
  ###############################  Creating data in list format necessary for Stan ####################################
       occ.stan.dat <- list(N = N,
                            enc = enc,
-                           hypox = dat[s,],
-                           prior_mu = c(0, logit(det), 0),
-                           prior_sd = c(10, 10, 10)) #flatter- 1
+                           hypox = dat[s,],  #solo = dat
+                           prior_mu = c(priors$mean[1], priors$mean[2], 0),
+                           prior_sd = c(priors$sd[1], priors$sd[2], 10)) #flatter- 1
       
       
   ###############################################  STAN MODEL  ############################################ 
@@ -93,8 +93,8 @@ test.init <- function(dat, tru) {
       simz$hypox.p_bias[s] <- (simz$hypox.p_post[s] - hypox.p) / simz$hypox.p_post[s]
       
       # retrieve the SD 
-      simz$occ_sd[s] <- sum$sd[1]
-      simz$det_sd[s] <- sum$sd[2]
+      simz$occ_sd[s] <- sum$sd[4]
+      simz$det_sd[s] <- sum$sd[5]
       simz$hypox.p_sd[s] <- sum$sd[3]
       
     } #end s for loop
@@ -103,12 +103,12 @@ test.init <- function(dat, tru) {
     
   } #end j for loop
   if (j %% 2 == 0) {
-    update <- paste(Sys.time(), ' - ', dat, ' - ', j/24*100, '% done!', sep = '')
+    update <- paste(Sys.time(), ' - ', dat, ' - ', j, 'done!', sep = '')
     write(update, file = 'progress.txt', append = TRUE)
   }
   
   save(simz_list, file= "Simz_list.Rdata")
-  #save(simz_list, file= paste('~/Documents/MCMC/Library/Simz_list', name, '.Rda', sep=''))
+  #save(simz_list, file= paste('~/Documents/MCMC/Library/Simz_listzzzzz', name, '.Rda', sep=''))
 
 } #end fxn
 
