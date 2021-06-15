@@ -1,0 +1,117 @@
+---
+title: "Fig_MCMC_Results"
+author: "Montana McLeod"
+date: "3/18/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "~/Box Sync/McLeod_thesis/Code")
+```
+
+# Average over the dataframe
+```{r}
+library(ggplot2)
+load("../Data/Simz_list.Rdata")
+ inits <- read.csv("../Data/inits.csv")
+ 
+avg_bias_occ <- NULL
+avg_bias_det<- NULL
+avg_bias_hypox<- NULL
+
+# Average over the simulation results
+for( i in 1:24){
+  simz <-na.omit(simz_list[[i]])
+  avg_bias_occ[i] <- mean(simz[,7])
+    avg_bias_det[i] <- mean(simz[,9])
+    avg_bias_hypox[i] <- mean(simz[,11])
+}
+
+
+avg_bias <- data.frame(param = rep(c("occ", "det", "hypox.p"), each = length(avg_bias_det)), index= rep(1:24,3), bias = c(avg_bias_occ*100, avg_bias_det*100, avg_bias_hypox*100))
+#avg_bias[avg_bias$param =="hypox.p", 3] <- avg_bias[avg_bias$param =="hypox.p", 3] / 10
+#avg_bias_norm <- avg_bias[avg_bias$bias <= 100 & avg_bias$bias >= -100, ]
+
+```
+
+# Bias by points
+```{r}
+ggplot(avg_bias[ avg_bias$bias >= -100, ], aes(x=index, y=bias, color= param))+
+  geom_point()
+```
+
+# Heat Map of the true value with bias
+```{r}
+
+#prepare trail names based on combo of params
+  ODH <-with(inits, paste0(occ, "- ",det,"- ",hypox.p ) ) 
+  abs_avgs <- cbind(avg_bias, rep(ODH, times = 3))
+
+abs_avgs$bias <- abs(abs_avgs$bias) #absolute bias to make plotting easier
+colnames(abs_avgs)[colnames(abs_avgs) == "rep(ODH, times = 3)"] <- "Occ.Det.Hypox"
+
+# Heat map for each set of parameters
+ggplot(abs_avgs, aes(param, Occ.Det.Hypox)) +
+  geom_tile(aes(fill = bias), colour = "white") +
+  scale_fill_gradient2(low = "white", mid = "lightblue", high = "darkblue")
+
+# create df only w/ biases < 50  
+best_avgs <- abs_avgs %>% 
+    filter(bias < 50) %>% 
+  spread(key= param, value= bias) 
+
+# remove param. combos that are not < 50
+best_avgs <- best_avgs %>% 
+  filter(!is.na(occ)) %>% 
+  filter(!is.na(det)) %>% 
+   filter(!is.na(hypox.p))
+
+#reformat for ggplot
+best_avgs <- best_avgs %>% 
+  gather(key = param, value = bias, -Occ.Det.Hypox, -index)
+
+# heat map of param cambos < 50
+ggplot(best_avgs, aes(param, Occ.Det.Hypox)) +
+  geom_tile(aes(fill = bias), colour = "white") +
+  scale_fill_gradient2(low = "white", mid = "lightblue", high = "darkblue") +
+  theme_classic()
+
+```
+
+# ggplot of posterior with true values 
+```{r}
+
+post_occ <- NULL
+post_det<- NULL
+post_hypox<- NULL
+
+# Average over the simulation results
+for( i in 1:24){
+  simz <-na.omit(simz_list[[i]])
+    post_occ[i] <- mean(simz[,4])
+    post_det[i] <- mean(simz[,5])
+    post_hypox[i] <- mean(simz[,6])
+}
+
+inits$post_occ <- post_occ
+inits$post_det <- post_det
+inits$post_hypox <- post_hypox
+
+# need to reformat to get the line graph I wanted
+ggplot(inits, aes(occ, post_occ)) +
+  geom_path()
+
+
+```
+
+```{r}
+
+```
+
+
+
+
+
+
+
