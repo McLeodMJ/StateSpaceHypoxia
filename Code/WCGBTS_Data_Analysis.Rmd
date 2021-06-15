@@ -235,9 +235,19 @@ plot(Grock$year, resid(Grock.lm)) #poor fit
 
 # binomial w/ presence& absence 
 ```{r}
-GRhyp_pres.glm <- glm(Presence ~ -1 + Hypoxia, data = Spe_present, family = binomial)
+GRhyp_pres.glm <- glm(Presence ~ -1 + mean_hyp, data = Spe_present, family = binomial)
 plot(allEffects(GRhyp_pres.glm))
 
 ```
+
+# false positives
+```{r}
+library(cutpointr)
+zzz <- cutpointr(na.omit(Spe_present), mean_hyp, Presence, boot_runs = 100)
+zz <- cutpointr(na.omit(Spe_present), mean_hyp, Presence, method = oc_manual, cutpoint = 1.43, boot_runs = 100) #sets cut point at hypoxic threshold
+summary(zz)
+plot(zzz)
+```
+
 
 
