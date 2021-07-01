@@ -1,3 +1,14 @@
+require(rstan)
+require(bayesplot)
+require(shinystan)
+require('dplyr')
+require(purrr)
+require(readxl)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+
+setwd("~/Documents/THESIS/StateSpaceHypoxia/Code")
 #Load MCMC files/ fxns
 load("../Data/DO_sims.Rdata")
 load("./Results/Priors_fromNO_Hypox.Rdata") # priors from MCMC bias runs [occ & det]?
@@ -14,10 +25,10 @@ source("./Library/fecmat.R")
 source("./Library/p.filter.R")
 
 # Format data
-dat <- bad_yr$Sim_DO_matrix[1,]
+data <- bad_yr$Sim_DO_matrix[1,]
 priors <- summ
 Dsole_f <- Sp_depl[Sp_depl$Species == "Dsole", 3] #expected Dsole fishing rate based on SPR analysis
-N <- length(dat)
+N <- length(data)
 mesh = 200
 
 # Set true parameter values 
@@ -34,26 +45,50 @@ Pop <- round(Pop.var$Pop.matrix)
 
 # Take sample of population 
 Pop.samp <- Pop* 0.001
-Pop.temp <- rpois(length(Pop.samp), Pop.samp) # sample of pop serves as mean
-dim(Pop.temp) <- dim(pop.temp)
+Pop.sim <- rpois(length(Pop.samp), Pop.samp) # sample of pop serves as mean
+dim(Pop.sim) <- dim(Pop.samp)
 
 #' sampling - fraction of pop 
 #' rpois - mean of sampling draw -> pop 
 # encounters [0 or 1]
-occ.full <- hypox.p * dat #linear dep. on hypoxia
-occ.prop <- occ.full/ occ.full[which.max(occ.full)] # new occ is >1 so this settles them proportional to max value
-enc <- rbinom(N, 1, occ.prop) * rbinom(N, 1, det)  # gets 0 or 1 for detection
+occ.full <- inv_logit(hypox.p * data) #linear dep. on hypoxia
+enc <- rbinom(N, 1, occ.full) * rbinom(N, 1, det)  # gets 0 or 1 for detection
 
-# predicted absences  
-Pop.temp <- Pop 
-for( i in 1:N){
-  if(enc[i] == 0){
-    Pop.temp[,i] <- rep(-999, 200) 
-  }} #removes zeros to be 'NAs'
 
 # Particle Filter Sim Pop & Likelihood
-#Pop.count <- p.filter(Pop.eq$Pop.matrix, Pop.temp, "Dsole", 4, Dsole_f, NA, mesh, 100, N, 0.01, 0.1, 0.1) # uses the IPM sims w/ variation as data
+#Pop.count <- p.filter(Pop.eq$Pop.matrix, Pop.sim, "Dsole", 4, Dsole_f, NA, mesh, 100, N, 0.01, 0.1, 0.1) # uses the IPM sims w/ variation as data
 
 # Accounting for false F's
 ##' cutpointr() library has rate calclulators
-##' 
+
+
+
+model <- stan_model(occ.mod5)
+###############################  Creating data in list format necessary for Stan ####################################
+occ.stan.dat <- list(N = N,
+                     mesh = 200,
+                     enc = enc,
+                     hypox = dat,
+                     nact = Pop.list,
+                     Dat = Pop.eq$Pop.matrix,
+                     fish = fish,
+                     selc = 1,
+                     q = 100,
+                     Cv = 0.01,
+                     Cv_q = 0.1,
+                     Sigma_p = 0.1,
+                     prior_mu = c(priors$mean[1], priors$mean[2], 0, Dsole_f),
+                     prior_sd = c(priors$sd[1], priors$sd[2], 10, 0.01))
+
+
+fit <- sampling(object = model, 
+                data = occ.stan.dat,
+                chains = 1, 
+                cores = 3,
+                iter = 2000, 
+                warmup = 1000,
+                control = list(adapt_delta = 0.95))
+
+pairs(fit)
+traceplot(fit)
+summary(fit)$summary
