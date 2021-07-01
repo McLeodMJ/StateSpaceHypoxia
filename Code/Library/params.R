@@ -42,7 +42,8 @@ params <- function(sp){
     selc.F.p4 = -0.723,
     selc.F.p6 = -1.455,
     bin.len = 65,# page 37 & 207 of assessment
-    bin.wth = 1)
+    bin.wth = 1,
+    selc = spline(Sp_selex$Dsole, n=200)$y)
     
   }
   
@@ -79,7 +80,8 @@ params <- function(sp){
       selc.p5 = -999, 
       selc.p6 = -999,
       bin.len =140, #data.ss_new file from SS
-      bin.wth = 2)
+      bin.wth = 2,
+      selc = spline(Sp_selex$Lingcod, n=200)$y)
   }
   
   # Female parameters
@@ -122,7 +124,8 @@ params <- function(sp){
       selc.p5 = -5,
       selc.p6 = -999,
       bin.len = 45, #max length page 145
-      bin.wth = 1) 
+      bin.wth = 1,
+      selc = spline(Sp_selex$Grock, n=200)$y) 
     
   }
   
@@ -159,7 +162,8 @@ params <- function(sp){
       selc.p5 = -999, 
       selc.p6 = -999 ,
       bin.len = 65, # found in YTRK.north.data.ss
-      bin.wth = 1)
+      bin.wth = 1,
+      selc = spline(Sp_selex$Yrock, n=200)$y)
    }
   return(Params)
 }
