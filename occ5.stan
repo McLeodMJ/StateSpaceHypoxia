@@ -1,5 +1,4 @@
-
-write("data{
+data{
     		int<lower=1> N; //number of samples
     		int<lower=1> mesh; //number of size bins
     		vector[N] enc; //list of encounters
@@ -16,7 +15,6 @@ write("data{
     			real<lower=0> Cv;
     		  real<lower=0> Cv_q;
     		  real<lower=0> Sigma_p;
-    		  matrix[N,q] likel;
     		  
     	}
     	parameters{
@@ -27,22 +25,23 @@ write("data{
     	transformed parameters{
     		real<lower=0,upper=1> det; // detection
     		det = inv_logit(logit_det);
-    		vector[N] likel;
-    		likel = p.filter(Dat, nact, fish[1], hypox_p, fi, selc, mesh, q, Time, Cv, Cv_q, Sigma_p);
-    			}
+    		int likel[N,N] = p.filter(Dat, nact, fish[1], hypox, fi, Selc, mesh, q, N, Cv, Cv_q, Sigma_p)$likelihood;
+    	}
+    	// rbinom()hypox.p
     	
     	model{
     	  // storage
     	    vector[N] occ_eff;
     
     	  // weakly informative priors
+    		logit_occ ~ normal(prior_mu[1],prior_sd[1]);
     		logit_det ~ normal(prior_mu[2],prior_sd[2]);
     		hypox_p ~ normal(prior_mu[3],prior_sd[3]);
     		fi ~ lognormal(prior_mu[4],prior_sd[4]);
     
     	// likelihoods
     		for(i in 1:N){
-    			occ_eff[i] = inv_logit(hypox_p*hypox[i]);
+    			occ_eff[i] = hypox_p*hypox[i];
     			
     			// Hurdle model
     			if(enc[i] == 0){
@@ -55,10 +54,6 @@ write("data{
     				  target += occ_eff[i] + bernoulli_logit_lpmf(1| logit_det ) + likel[i] ;
     		// add likelihood from p.filter to binomial calc but need to add fi - fishing rate
     		// 
-    		  }
     		}
-    	}",  
-      "occ5.stan")
-
-occ.mod5 <- "occ5.stan"
-model <- stan_model(occ.mod5) # remove when working
+        }
+    	}
