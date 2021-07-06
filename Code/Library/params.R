@@ -8,7 +8,7 @@
 
 params <- function(sp){
   # Female Parameters
-  if(sp == "Dsole"){
+  if(sp == "Dsole" | sp == 1){
    Params <- list(
      name = "Dsole",
     R0 = 12.85,  #unfished R0 - ln(r0) or # 380777 recruits
@@ -48,7 +48,7 @@ params <- function(sp){
   }
   
   # Parameters from Northern model & Female
- if(sp == "Lingcod"){
+ if(sp == "Lingcod" | sp == 2){
     Params <- list( 
       name = "Lingcod",
       R0 = 9.0669, #ln(r0) // #8037
@@ -85,7 +85,7 @@ params <- function(sp){
   }
   
   # Female parameters
- if(sp == "Grock"){
+ if(sp == "Grock" | sp == 3){
     Params <- list( 
       name = "Grock",
       R0 = 9.62,# - ln(R0) // 15041 recruits
@@ -130,7 +130,7 @@ params <- function(sp){
   }
   
   # Parameters from Northern model & Female
- if(sp == "Yrock"){
+ if(sp == "Yrock" | sp == 4){
     Params <- list( 
       name = "Yrock",
       R0 = 10.83, # ln(R0) // 49090000 recruits
