@@ -16,15 +16,17 @@
 #####################################
 ### PraCTICE IF WORKS
 
-#load("../Data/Hist_spp.Rdata")
-#load("./Results/Expected_Fishing_rate.Rdata")
-#source("./Library/params.R")
-#source("./Library/kernmat.R")
-#source("./Library/fecmat.R")
+# load("../Data/Hist_spp.Rdata")
+# load("./Results/Expected_Fishing_rate.Rdata")
+# source("./Library/params.R")
+# source("./Library/kernmat.R")
+# source("./Library/fecmat.R")
+# Sp_selex <- read.csv("../Data/Sp.selex.csv") 
+
 
 #######################################
 
-p.filter <- function(dat, Nact, fish, hypox, fi, mesh, Q, time, cv, cv_q, sigma_p){
+p.filter <- function(dat, Nact, hypox, fish, hypox.p, fi, mesh, Q, time, cv, cv_q, sigma_p){
   
   # Particle filter: (following Knape & deValpine 2012)
   N <- matrix(NA, nrow = nrow(dat), ncol = time)
@@ -40,7 +42,7 @@ p.filter <- function(dat, Nact, fish, hypox, fi, mesh, Q, time, cv, cv_q, sigma_
   # Step 1: Initialize the model 
     # resample for accuracy
     ftmp <- matrix(NA, nrow= time, ncol = Q)
-    Avg.likel <- vector(NA, time) #average of the ftmp
+    Avg.likel <- rep(NA, time) #average of the ftmp
     ftmp[1,] <- rep(1, Q)
     Wgt = cumsum(ftmp[1,]/ sum(ftmp[1,]))  
     Rnd = runif(Q)
@@ -57,12 +59,14 @@ p.filter <- function(dat, Nact, fish, hypox, fi, mesh, Q, time, cv, cv_q, sigma_
   ## Step 2: simulate encounters for Null or absences based on hypoxia parameter 
   
   #threshold -50
-  ??????? occ.full.2 <- inv_logit(hypox * data) #linear dep. on hypoxia
+  occ.full.2 <- inv_logit(hypox * hypox.p) #linear dep. on hypoxia
   # may want to replace data with simulated pop and set a threshold
-  enc.2 <- rbinom(time, 1, occ.full.2) # hypox rate 
+  # threshold is blanket greater .5 then it is true. [check the hypox for if larger is 0 or 1]
+  
+  # for loop but of occ.full.2 
   for(i in 1:time){
-    if(enc.2[i] == 0){
-      ftmp[i,] <- rep(-999, Q) # replace zero observ. moments with -999
+    if(occ.full.2[i] <= 0.89){
+      ftmp[i,] <- rep(-999, Q) # think its due to hypox replace zero observ. moments with -999 [true zero =]
     }}
   
   ## Step 3: run model through time T 
@@ -107,10 +111,11 @@ p.filter <- function(dat, Nact, fish, hypox, fi, mesh, Q, time, cv, cv_q, sigma_
       ftmp[t,] = colSums(likel) #log-likelihood vector
       Avg.likel[t] = mean(ftmp) # if we want to create a vector of likelihoods
     } else {
-      #OKlen <- selc * dat
+      WClen <- selc * dat
       likel <- dpois(matrix(rep(Nact[,t], Q), ncol=Q), Nf[,t,] * dx * rep(WClen[,Q]), log= T) 
       likel[which(!is.finite(likel))] <- 0
       ftmp[t,] = colSums(likel) #log-likelihood vector
+      Avg.likel[t] = mean(ftmp)
       #ftmp(t,:) = sum(log(max(realmin,poisspdf(repmat(Nact(:,t),[1,1,Q]),(NT(t-length(Tpre))*dy*Nf(:,t,:)).*repmat(OKlen(:),[1,1,Q])))));
       # oklen = filter out sizes wouldnt see in the data (btw 0-1: with full selection at 1)
     }
@@ -136,19 +141,18 @@ p.filter <- function(dat, Nact, fish, hypox, fi, mesh, Q, time, cv, cv_q, sigma_
   return(Pfilter_data)
 }
 
-#' dat = Pop.eq$Pop.matrix
-#' Nact = Pop.sim
-#' fish = "Dsole"
-#' hypox = 4
-#' fi = Dsole_f
-#' selc = NA
-#' mesh = 200
-#' Q = 100
-#' time = N
-#' cv = 0.01
-#' cv_q = 0.1
-#' sigma_p = 0.1
-
+# dat = Pop.eq$Pop.matrix
+# Nact = Pop.sim
+# fish = "Dsole"
+# hypox = data
+#hypox.p = 4  
+# fi = Dsole_f
+# mesh = 200
+# Q = 100
+# time = N
+# cv = 0.01
+# cv_q = 0.1
+# sigma_p = 0.1
 
 
 
