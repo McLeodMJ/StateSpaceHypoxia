@@ -9,14 +9,12 @@ write("data{
     		// p.filter variables
     			int nact[mesh, N];
     			matrix[mesh, N] Dat;
-    			vector[4] fish;
-    			int<lower=1> selc;
+    			int<lower=1> fish;
     			int<lower=1> q;
     			int<lower=1> Time;
     			real<lower=0> Cv;
     		  real<lower=0> Cv_q;
     		  real<lower=0> Sigma_p;
-    		  matrix[N,q] likel;
     		  
     	}
     	parameters{
@@ -26,9 +24,9 @@ write("data{
     	}
     	transformed parameters{
     		real<lower=0,upper=1> det; // detection
-    		det = inv_logit(logit_det);
     		vector[N] likel;
-    		likel = p.filter(Dat, nact, fish[1], hypox_p, fi, selc, mesh, q, Time, Cv, Cv_q, Sigma_p);
+    		det = inv_logit(logit_det);
+    		likel = p.filter(Dat, nact, hypox, 1, hypox_p, fi, mesh, q, Time, Cv, Cv_q, Sigma_p)$likelihood;
     			}
     	
     	model{
