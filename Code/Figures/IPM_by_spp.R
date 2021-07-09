@@ -2,8 +2,8 @@ require(ggplot2)
 require(patchwork)
 
 setwd("/Users/montanamcleod/Documents/THESIS/StateSpaceHypoxia/Code")
-load("./Results/Expected_Fishing_rate.Rdata") #from the SPR vs fishing values ## F priors
-
+load("./Results/Expected_Fishing_rate.Rdata")
+Sp_selex <- read.csv("../Data/Sp.selex.csv") 
 
 source("./Library/params.R")
 source("./Library/kernmat.R")
@@ -31,7 +31,7 @@ for (f in fish){
     Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)  
     
     ## Kernel functions 
-    K <- kernmat(x, pars, Sp_depl[Sp_depl$Species == f, 3], 1)
+    K <- kernmat(x, pars, pars$f)
     Fe<- fecmat(x, pars)
     
     ### Initialize the model:
