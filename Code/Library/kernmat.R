@@ -1,4 +1,4 @@
-kernmat <- function(x, pars, fi, timestep){
+kernmat <- function(x, pars, fi){
   
   ### create a mesh grid of size changes
   Size_c = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
