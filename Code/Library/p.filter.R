@@ -81,7 +81,7 @@ p.filter <- function(dat, Nact, hypox, fish, hypox.p, fi, mesh, Q, time, cv, cv_
   ## size distribution of recruits
   Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)  
   
-  K <- kernmat(x, pars, Dsole_f,  1)
+  K <- kernmat(x, pars, Dsole_f)
   Fe <- fecmat(x, pars)
   
   for (t in 2:time){
@@ -141,19 +141,18 @@ p.filter <- function(dat, Nact, hypox, fish, hypox.p, fi, mesh, Q, time, cv, cv_
   return(Pfilter_data)
 }
 
-# dat = Pop.eq$Pop.matrix
-# Nact = Pop.sim
-# fish = "Dsole"
-# hypox = data
-#hypox.p = 4  
-# fi = Dsole_f
-# mesh = 200
-# Q = 100
-# time = N
-# cv = 0.01
-# cv_q = 0.1
-# sigma_p = 0.1
-
+dat = Pop.eq$Pop.matrix
+Nact = Pop.sim
+fish = "Dsole"
+hypox = data
+ypox.p = 4  
+fi = Dsole_f
+mesh = 200
+Q = 100
+time = N
+cv = 0.01
+cv_q = 0.1
+sigma_p = 0.1
 
 
 
