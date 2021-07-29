@@ -24,6 +24,8 @@
 # Sp_selex <- read.csv("../Data/Sp.selex.csv") 
 
 
+####################
+MUST CHANGE SO IT REMOVES THE BH EQUATION AND JUST INCLUDES RECRUITMENT AS A FIXED PARAM & SELEC : WCLEN SHOULD JSUT BE A VECTOR OF MESH SIZES
 #######################################
 
 p.filter <- function(dat, Nact, hypox, fish, hypox.p, fi, mesh, Q, time, cv, cv_q, sigma_p){
@@ -32,7 +34,7 @@ p.filter <- function(dat, Nact, hypox, fish, hypox.p, fi, mesh, Q, time, cv, cv_
   N <- matrix(NA, nrow = nrow(dat), ncol = time)
   
   # Generate Q particles (independent simulations of N):
-  Nf = array(rep(NA, nrow(N) * time * Q), c(nrow(N), time, Q)) #pop.dist. x time x particles
+  Nf <- array(rep(NA, nrow(N) * time * Q), c(nrow(N), time, Q)) #pop.dist. x time x particles
   Nf[,1,] <- dat[,time] #saves last column of equil. data
   
   # Simulate random variation for first particle
@@ -141,18 +143,16 @@ p.filter <- function(dat, Nact, hypox, fish, hypox.p, fi, mesh, Q, time, cv, cv_
   return(Pfilter_data)
 }
 
-dat = Pop.eq$Pop.matrix
-Nact = Pop.sim
-fish = "Dsole"
-hypox = data
-ypox.p = 4  
-fi = Dsole_f
-mesh = 200
-Q = 100
-time = N
-cv = 0.01
-cv_q = 0.1
-sigma_p = 0.1
-
-
-
+# dat = Pop.eq$Pop.matrix
+# Nact = Pop.sim
+# fish = "Dsole"
+# hypox = data
+# ypox.p = 4  
+# fi = Dsole_f
+# mesh = 200
+# Q = 100
+# time = N
+# cv = 0.01
+# cv_q = 0.1
+# sigma_p = 0.1
+# 
