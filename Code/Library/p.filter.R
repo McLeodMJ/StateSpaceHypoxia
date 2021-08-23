@@ -99,7 +99,7 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
       
       #RR <- exp(rnorm(1, mean = log(Recruits) - ((cv * log(Recruits))^2)/2, sd= cv * log(Recruits) ))# change cv to 0 for no variation
       
-      Nf[,t, q] = Nf[,t, q] + rec_var * (Rvec * Recruits) + Nrand  # move the model forward for each particle 
+      Nf[,t, q] = Nf[,t, q] + rec_var[t] * (Rvec * Recruits) + Nrand  # move the model forward for each particle 
     } # end of Q loop
     Nf[Nf < 0] = 0
     
