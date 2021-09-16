@@ -119,7 +119,6 @@ for (f in fish){
         # Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
         Recruits <- (4 * pars$steep * exp(pars$R0) * E[t]) / ((pars$S0 * (1 - pars$steep)) + (E[t] * (5 * pars$steep - 1)))
         N[,t] = N[,t] + Recruits * Rvec # + rnorm()*process noise 
-        # Y[,t] = rnorm()*observation error
       } #end of model
   
     df2[df2$F.rate == fi[i] & df2$Species == f, 3 ] <- E[time]
