@@ -10,7 +10,7 @@ params <- function(sp){
   # Female Parameters
   if(sp == "Dsole" | sp == 1){
    Params <- list(
-     name = "Dsole",
+    name = "Dsole",
     R0 = 12.85,  #unfished R0 - ln(r0) or # 380777 recruits
     R0.sd = 0.35, #fixed
     steep = 0.8, 
