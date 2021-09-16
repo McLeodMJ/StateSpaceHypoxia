@@ -59,15 +59,15 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
   ## Step 2: simulate encounters for Null or absences based on hypoxia parameter 
   
   #threshold -50
-  occ.full.2 <- inv_logit(hypox * hypox_p) #linear dep. on hypoxia
+  #occ.full.2 <- det + inv_logit(hypox * hypox_p) #linear dep. on hypoxia
   # may want to replace data with simulated pop and set a threshold
   # threshold is blanket greater .5 then it is true. [check the hypox for if larger is 0 or 1]
   
   # for loop but of occ.full.2 
-  for(i in 1:time){
-    if(occ.full.2[i] <= 0.89){
-      ftmp[i,] <- rep(-999, Q) # think its due to hypox replace zero observ. moments with -999 [true zero =]
-    }}
+  #for(i in 1:time){
+   # if(occ.full.2[i] <= 0.89){
+    #  ftmp[i,] <- rep(NA, Q) # think its due to hypox replace zero observ. moments with -999 [true zero =]
+    #}}
   
   ## Step 3: run model through time T 
     # Create the kernel:
@@ -87,7 +87,7 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
     
     # Advance the model, one particle at a time
     for(q in 1:Q){
-      Nrand = rnorm(nrow(N), 0 , sigma_p) #processs error
+      Nrand = matrix(rnorm(mesh * Q, 0 , sigma_p), mesh, Q) #processs error
       
       # integration
       Nf[,t,q] <- K %*% Nf[,t-1,q]  * dx  # midpoint rule integration
@@ -99,27 +99,49 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
       
       #RR <- exp(rnorm(1, mean = log(Recruits) - ((cv * log(Recruits))^2)/2, sd= cv * log(Recruits) ))# change cv to 0 for no variation
       
-      Nf[,t, q] = Nf[,t, q] + rec_var[t] * (Rvec * Recruits) + Nrand  # move the model forward for each particle 
-    } # end of Q loop
+      Nf[,t, q] = Nf[,t, q] + rec_var[t] * (Rvec * Recruits) + Nrand[ ,q]  # move the model forward for each particle 
+    #  Nf(:,t,q) = kmat*Nf(:,t-1,q) + RR + Nrand(:,:,q);  % Eq 2 from White et al. PLoS ONE
+    
+      } # end of Q loop
     Nf[Nf < 0] = 0
     
-    # Need to look into WCGBTS Selectivity
-    #if (length(selc) == 1){
-    #   likel <- dpois(matrix(rep(Nact[,t], Q), ncol=Q), Nf[,t,] * dx, log= T) 
-       #' mean is intergration of NF to get counts b/c working with densities prior - midpt rule 
-    #  likel[which(!is.finite(likel))] <- 0
-     # ftmp[t,] = colSums(likel) #log-likelihood vector
-     # Avg.likel[t] = mean(ftmp) # if we want to create a vector of likelihoods
-    #} else {
+    # WCGBTS Selectivity
       WClen <- pars$selc
+      
+      ############################### LIKELIHOOD ############################
+      det <- inv_logit(hypox * hypox_p)
+      
       likel <-dpois(Nact[,t], Nf[,t,] * dx * WClen, log= T)
+      #= sum(log(max(realmin,poisspdf(repmat(Nact(:,t),[1,1,Q]),(NT(t-length(Tpre))*dy*Nf(:,t,:)).*repmat(OKlen(:),[1,1,Q])))));
       likel[which(!is.finite(likel))] <- 0
-      ftmp[t,] = colSums(likel) #log-likelihood vector
+      # eqn we worked through on 9/1
+      #ftmp[t,] = colSums(likel) * occ.full.2 + (1 - occ.full.2) * (sum(Nact[,t]) == 0)  #log-likelihood vector
+      ### eqn 1
+      #ftmp[t,] = ifelse(sum(Nact[,t]) == 0, (1 - occ.full.2), colSums(likel) * occ.full.2 )  #log-likelihood vector
+      ### eqn 2/3
+      #likel_b <- dbinom(x = Nact[,t], size = Nf[,t,], prob = det[t])
+       if(sum(Nact[,t]) == 0){ 
+         # absent
+        ftmp[t,] <- colSums(likel) * c(1 - det[t])
+        }else{
+          #present
+         ftmp[t,] <- colSums(likel) * det[t]
+        }
       Avg.likel[t] = mean(ftmp[t,])
-      #ftmp(t,:) = sum(log(max(realmin,poisspdf(repmat(Nact(:,t),[1,1,Q]),(NT(t-length(Tpre))*dy*Nf(:,t,:)).*repmat(OKlen(:),[1,1,Q])))));
-      # oklen = filter out sizes wouldnt see in the data (btw 0-1: with full selection at 1)
-   # }
-    # if averages over trawl (lognormal) otherwise poisson dpois()
+      
+      ### alternative LLs
+      #likel_b = c(log( det[t] + exp(log(1 - det[t]) + 1)))
+      #likel_p = log(1 - det[t]) + colSums(dpois(Nact[,t], Nf[,t,] * dx * WClen, log= T))
+     
+    
+      # check - put in true parameters values from process model and check that it gives a higher likelihood for those over the recruitment was half of that year, fi- is 50% higher 
+      
+      
+    # if negative binomial would be better THAN POISON
+      #likel = dnbinom(x = Nact[,t], size = occ.full.2, mu = Nf[,t,] * dx * WClen, log= T)
+      #size is target for no. of successful trials ???
+      # cannot do p instead of size 
+      
  
    ## Step 4: Resample    
     Wgt = cumsum(ftmp[t,]/ sum(ftmp[t,]))
@@ -134,24 +156,24 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
     N[,t] = Nf[,t,Ind2] # pick one randomly to be *the* distribution to carry forward to the next step
     } # end of t loop
   
-  
-  Pfilter_data <- list (likelihood = Avg.likel,
+
+  Pfilter_data <- list(likelihood = Avg.likel,
                          Pop = N)
   
   return(Pfilter_data)
 }
-
 # dat = Pop.eq$Pop.matrix
 # Nact = Pop.sim
 # fish = "Dsole"
-# hypox = data
+# hypox = runif(20)*3
 # hypox_p = 4  
 # fi = Dsole_f
 # mesh = 200
 # Q = 100
-# time = N
+# time = time
 # cv = 0.01
 # rec_var = rep(0.1, time)
 # cv_q = 0.1
 # sigma_p = 0.1
 
+ 
