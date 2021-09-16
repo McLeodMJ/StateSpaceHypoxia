@@ -112,7 +112,7 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
      # Avg.likel[t] = mean(ftmp) # if we want to create a vector of likelihoods
     #} else {
       WClen <- pars$selc
-      likel <- dpois(Nact[,t], Nf[,t,] * dx * WClen, log= T) 
+      likel <-dpois(Nact[,t], Nf[,t,] * dx * WClen, log= T)
       likel[which(!is.finite(likel))] <- 0
       ftmp[t,] = colSums(likel) #log-likelihood vector
       Avg.likel[t] = mean(ftmp[t,])
@@ -145,12 +145,13 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
 # Nact = Pop.sim
 # fish = "Dsole"
 # hypox = data
-# ypox.p = 4  
+# hypox_p = 4  
 # fi = Dsole_f
 # mesh = 200
 # Q = 100
 # time = N
 # cv = 0.01
-# rec_var = 0.1
+# rec_var = rep(0.1, time)
 # cv_q = 0.1
 # sigma_p = 0.1
+

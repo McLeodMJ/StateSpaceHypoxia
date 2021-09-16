@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 require("knitr")
-opts_knit$set(root.dir = "~/Documents/THESIS/StateSpaceHypoxia/Code")
+opts_knit$set(root.dir = "~/Box Sync/McLeod_thesis/Code")
 ```
 
 ```{r}
@@ -46,7 +46,7 @@ Total_sp_data <- Total_sp_data %>%
     ordered = TRUE)) #Sets the Month to automatically order via month order [lubridate package]
 
 Total_sp_data <- Total_sp_data[ ,c(1,8,2,12, 3:7, 10:11)] #reorganize 
-Total_sp_data <- Total_sp_data[Total_sp_data$year != 2009, ] #remove year w/0 le gths
+Total_sp_data <- Total_sp_data[Total_sp_data$year != 2009, ] #remove year w/0 lengths
 ```
 
 
@@ -55,32 +55,36 @@ Total_sp_data <- Total_sp_data[Total_sp_data$year != 2009, ] #remove year w/0 le
 
 #GREENSTRIPED ROCKFISH
 Grock <- subset(Total_sp_data, common_name == "greenstriped rockfish", select = c(trawl_id : longitude_dd, length_cm : temperature_at_gear_c_der) )
+Grock <- Grock[Grock$sex == "F",]
 table(Total_sp_data$common_name) #check no. of datapoints match with new DF
 
 #YELLOWTAIL ROCKFISH
 Yrock <- subset(Total_sp_data, common_name == "yellowtail rockfish", select = c(trawl_id : longitude_dd, length_cm : temperature_at_gear_c_der) )
+Yrock <- Yrock[Yrock$sex == "F",]
 
 #LINGCOD
 Lingcod <- subset(Total_sp_data, common_name == "lingcod", select = c(trawl_id : longitude_dd, length_cm : temperature_at_gear_c_der) )
+Lingcod <- Lingcod[Lingcod$sex == "F",]
 
 #DOVER SOLE
-Dsole <- subset(Total_sp_data, common_name == "Dover sole", select = c(trawl_id : longitude_dd, length_cm : temperature_at_gear_c_der) )
-
+Dsole <- subset(Total_sp_data, common_name == "Dover sole", select = c(trawl_id : longitude_dd, length_cm : temperature_at_gear_c_der))
+Dsole <- Dsole[Dsole$sex == "F",]
 ```
 
 # make a presence/ absence column
 ```{r}
 #species of interest
 zz <- Total_sp_data %>% 
-  filter(common_name == c("Dover sole", "greenstriped rockfish", "lingcod", "yellowtail rockfish"))
+  filter(common_name == c("Dover sole", "greenstriped rockfish", "lingcod", "yellowtail rockfish")) %>% 
+  filter(sex == "F") # only females SS params 
 
 # sp. density per trawl 
 x <- zz %>% 
   group_by(trawl_id, common_name) %>% 
-  summarise(density = n()) 
+  summarise(count = n()) 
 
 #record hypoxia per trawl
- xx <- Total_sp_data %>% 
+ xx <- zz %>% 
     group_by(trawl_id, Date) %>% 
     summarise(mean_hyp = mean(o2_at_gear_ml_per_l_der))
   
@@ -98,15 +102,87 @@ expand(trawl_id, common_name)
 # join all posibilties to df
 z <- zzz %>% dplyr::right_join(all)
 z <- z %>% fill(Date:mean_hyp)
-z$Presence <- ifelse(is.na(z$density), 0, 1) #present/ absent 
-z$density <- ifelse(is.na(z$density), 0, z$density) # 0 for no observation
+z$Presence <- ifelse(is.na(z$count), 0, 1) #present/ absent 
+z$count <- ifelse(is.na(z$count), 0, z$count) # 0 for no observation
 
 #Reorder by date
   index <- with(z, order(trawl_id, common_name)) #organizes by month then year
   Spe_present <- z[index,]
   
   
-save(list= c("Grock", "Yrock", "Lingcod", "Dsole", "Spe_present") ,file= "../Data/Groundfish.Hyp.Rdata")
+  
+#save(list= c("Grock", "Yrock", "Lingcod", "Dsole", "Spe_present") ,file= "../Data/Groundfish.Hyp.Rdata")
+```
+
+```{r}
+#species of interest
+ z <- Total_sp_data[!is.na(Total_sp_data$o2_at_gear_ml_per_l_der), ] # remove sample dates wehre NA is recorded for DO
+
+ zz <- z %>% 
+  filter(common_name == c("Dover sole", "greenstriped rockfish", "lingcod", "yellowtail rockfish")) %>% 
+  filter(sex == "F")    # only females of our sp.
+
+ Nact_hypox  <- z %>% 
+   group_by(trawl_id, Date) %>% 
+    summarise(mean_hyp = mean(o2_at_gear_ml_per_l_der)) # take avg DO value for each trawl b/c some collected multiple pts
+  
+
+```
+
+
+
+# Prepare Dataset from WCGBTS
+```{r}
+
+source("./Library/params.R")
+   Sp_selex <- read.csv("../Data/Sp.selex.csv") 
+   load("./Results/Expected_Fishing_rate.Rdata") #from the SPR vs fishing values ## F priors
+   load("../Data/Groundfish.Hyp.Rdata")
+   mesh=200
+   
+   # Need a vector of size bins for historgram
+   pars <- params("Dsole")
+   meshmax = pars$Linf * 2
+   x_D <- seq(from = 1, to = meshmax, length.out = mesh)
+   pars <- params("Grock")
+   meshmax = pars$Linf * 2
+   x_G <- seq(from = 1, to = meshmax, length.out = mesh)
+   pars <- params("Yrock")
+   meshmax = pars$Linf * 2
+   x_Y <- seq(from = 1, to = meshmax, length.out = mesh)
+   pars <- params("Lingcod")
+   meshmax = pars$Linf * 2
+   x_L <- seq(from = 1, to = meshmax, length.out = mesh)
+   
+   
+# x is the vector from params()
+act.data <- function(data, source.dat, x){
+  trawls <- unique(source.dat$trawl_id) # should be 3586 (8/27)
+  Nact <- matrix(-999, nrow = length(x), ncol = length(trawls)) # store new dataset aggregrated across trawls and size densitites 
+  
+  for (w in 1:length(trawls)){
+    h.dat <- hist(data[data$trawl_id == trawls[w], 7], breaks= c(x,Inf), plot = F)$count # creates densities by trawls
+    Nact[,w] <- h.dat 
+  
+    #BELOW IS FOR DENSITY REQUIREMENTS BUT WE NEED COUNTS(?)
+    # report trawl-ids as NA not as 0 present
+    #for(n in 1:length(x)){
+    #if(is.nan(Nact[n,w]) | is.na(Nact[n,w])){
+    #Nact[n,w] <- 0
+     #}
+   # }
+  }
+  
+  return(Nact)
+}
+
+ Nact_Dsole <- act.data(Dsole, Nact_hypox, x_D)  #round () if density
+ Nact_Grock <- act.data(Grock, Nact_hypox, x_G)  #round () if density
+ Nact_Yrock <- act.data(Yrock, Nact_hypox, x_Y) #round () if density 
+ Nact_Lingcod <- act.data(Lingcod, Nact_hypox, x_L) #round (,2) if density
+
+#save(Nact_Dsole, Nact_Grock, Nact_Yrock, Nact_Lingcod, Nact_hypox, file = "../Data/Hist_Spp.Rdata")
+#Nact_Grock <- act.data(Grock, Spe_present)
 ```
 
 
