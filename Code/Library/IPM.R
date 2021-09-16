@@ -3,7 +3,7 @@
 # Integral Projection Model
 ### evaluates size distribution across a timeseries based on SS parameters
 #' fish: species - "Lingcod" "Yrock"   "Grock"   "Dsole" 
-#' timestep: singular no. how long you want to run timeseries 
+#' time: singular no. how long you want to run timeseries 
 #' mesh= meshsize or how many bins(columns) to separate from 1 to maximum size of fish
 #' N0: Stable Age distribution (SAD) 
 ### if 1st run --> N0= NA (or 1) - output saves nexts runs N0 as $SAD or first list [[1]]
@@ -13,9 +13,9 @@
 ### if NO variation --> cv =0
 ### if including recruitment variation --> cv = number < 1
 
-IPM <- function (fish, fi, timestep, mesh, N0, cv){
+IPM <- function (fish, fi, time, mesh, N0, cv){
 
-  df <- data.frame( Time = 1:timestep, 
+  df <- data.frame( Time = 1:time, 
                   Type = rep(fish, length(time)),
                   Pop.Size =  rep(NA, length(time )))
 
@@ -33,11 +33,11 @@ IPM <- function (fish, fi, timestep, mesh, N0, cv){
     Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)  
     
   ## Kernel functions 
-    K <- kernmat(x, pars, Dsole_f, 1)
+    K <- kernmat(x, pars, Dsole_f)
     Fe<- fecmat(x, pars)
     
   ### Initialize the model:
-    N = matrix(0, nrow = meshsize, ncol = timestep) #pop size w/ growth/mortal kernel
+    N = matrix(0, nrow = meshsize, ncol = time) #pop size w/ growth/mortal kernel
     E <- NULL
     Recruits <- NULL
     
@@ -49,7 +49,7 @@ IPM <- function (fish, fi, timestep, mesh, N0, cv){
     } 
     
   ### Run the model
-  for (t in 2:timestep){
+  for (t in 2:time){
     N[,t] <- K %*% N[,t-1]  * dx  # midpoint rule integration
     E <- Fe %*% N[,t-1] * dx
     
@@ -61,7 +61,7 @@ IPM <- function (fish, fi, timestep, mesh, N0, cv){
     N[,t] = N[,t] + (Rvec * RR) # 
   } #end of model
   
-   N0 <- N[,timestep] # save SAD
+   N0 <- N[,time] # save SAD
     sims <- list(SAD = N0, 
              Pop.matrix = N)
     return(sims)
