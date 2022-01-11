@@ -46,7 +46,7 @@ Total_sp_data <- Total_sp_data %>%
     ordered = TRUE)) #Sets the Month to automatically order via month order [lubridate package]
 
 Total_sp_data <- Total_sp_data[ ,c(1,8,2,12, 3:7, 10:11)] #reorganize 
-Total_sp_data <- Total_sp_data[Total_sp_data$year != 2009, ] #remove year w/0 lengths
+Total_sp_data <- Total_sp_data[Total_sp_data$year %in% 2010:2014 & Total_sp_data$latitude_dd >= 43.8041, ] #remove year w/0 lengths
 ```
 
 
@@ -123,7 +123,7 @@ z$count <- ifelse(is.na(z$count), 0, z$count) # 0 for no observation
   filter(sex == "F")    # only females of our sp.
 
  Nact_hypox  <- z %>% 
-   group_by(trawl_id, Date) %>% 
+   group_by(trawl_id, Date, year) %>% 
     summarise(mean_hyp = mean(o2_at_gear_ml_per_l_der)) # take avg DO value for each trawl b/c some collected multiple pts
   
 
@@ -133,6 +133,13 @@ z$count <- ifelse(is.na(z$count), 0, z$count) # 0 for no observation
 
 # Prepare Dataset from WCGBTS
 ```{r}
+yrs <- unique(Nact_hypox$year)
+Nact_DO <- vector("list", length = length(yrs))
+names(Nact_DO) <- yrs
+for(y in 1:length(yrs)){
+Nact_DO[[y]] <- Nact_hypox[Nact_hypox$year == yrs[y], ]
+}
+
 
 source("./Library/params.R")
    Sp_selex <- read.csv("../Data/Sp.selex.csv") 
@@ -184,6 +191,56 @@ act.data <- function(data, source.dat, x){
 #save(Nact_Dsole, Nact_Grock, Nact_Yrock, Nact_Lingcod, Nact_hypox, file = "../Data/Hist_Spp.Rdata")
 #Nact_Grock <- act.data(Grock, Spe_present)
 ```
+
+
+# remove california data 
+```{r}
+Dsole_OR.WA <- Dsole[Dsole$latitude_dd >= 43.8041, ]
+Grock_OR.WA <- Grock[Grock$latitude_dd >= 43.8041, ]
+Ling_OR.WA <- Lingcod[Lingcod$latitude_dd >= 43.8041, ]
+Yrock_OR.WA <- Yrock[Yrock$latitude_dd >= 43.8041, ]
+
+Nact_hypox[Nact_hypox$trawl_id ]
+
+Dsole.OR.WA <- vector("list", length = 5)
+names(Dsole.OR.WA) <- unique(Dsole_OR.WA$year)
+for(d in 1:5){
+  yr <- as.numeric(names(Dsole.OR.WA))[d]
+   Dsole.OR.WA[[d]] <- act.data(Dsole_OR.WA[Dsole_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_D)
+}
+
+                     
+Grock.OR.WA <- vector("list", length = 5)
+names(Grock.OR.WA) <- unique(Grock_OR.WA$year)
+for(d in 1:5){
+  yr <- as.numeric(names(Grock.OR.WA))[d]
+   Grock.OR.WA[[d]] <- act.data(Grock_OR.WA[Grock_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_G)
+}
+
+Yrock.OR.WA <- vector("list", length = 5)
+names(Yrock.OR.WA) <- unique(Yrock_OR.WA$year)
+for(d in 1:5){
+  yr <- as.numeric(names(Yrock.OR.WA))[d]
+  Yrock.OR.WA[[d]] <- act.data(Yrock_OR.WA[Yrock_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_Y)
+}
+
+
+Ling.OR.WA <- vector("list", length = 5)
+names(Ling.OR.WA) <- unique(Ling_OR.WA$year)
+for(d in 1:5){
+  yr <- as.numeric(names(Ling.OR.WA))[d]
+  Ling.OR.WA[[d]] <- act.data(Ling_OR.WA[Ling_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_L)
+}
+
+#save(Ling.OR.WA, Grock.OR.WA, Yrock.OR.WA, Dsole.OR.WA, file="Nact_site_yr.Rdata") 
+```
+
+
+
+
+
+
+
 
 
 # Greenstriped rockfish Distributions
