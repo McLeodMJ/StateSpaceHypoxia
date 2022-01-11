@@ -3,7 +3,7 @@ kernmat <- function(x, pars, fi){
   ### create a mesh grid of size changes
   Size_c = t(matrix(x, nrow=length(x), ncol=length(x))) #- matrix of sizes at t  ## sizes same per column
   
-  ### selectivity eqn A.1.29 [appendix]
+  ### AGE selectivity eqn A.1.29 [appendix]
   #S = 1 /1 + e(-log(19)(L-B1) / B2)
   ## B1: len @50% female B2: diff btw len 95%-50% length at time t
   selc <- 1/ (1 + exp(-log(19) * (Size_c - pars$selc.50 ) / (pars$selc.100 - pars$selc.50)))
