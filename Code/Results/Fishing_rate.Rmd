@@ -144,8 +144,10 @@ for (f in fish){
 ## depletion that is cloest to SPR is the fishing rate
 z<- df2 %>% 
   group_by(Species) %>% 
-  mutate(zz = nearest(SPR, mean(Depletion))) %>% 
-  mutate(Exp.Frate = F.rate[zz])
+  mutate(index = nearest(SPR, mean(Depletion))) 
+zz <- z %>% 
+  group_by(Species) %>% 
+  mutate(Exp.Frate = F.rate[index])
 
 # average depletion
 Sp_depl <- z %>% 
@@ -172,6 +174,8 @@ ggplot(df2 , aes(x=F.rate, SPR, color= Species))+
     scale_fill_brewer(palette = "Accent")+
     facet_wrap(~Species, scale = "free") +
    geom_vline(aes(xintercept = Exp.F.rate), Sp_depl, color= "yellow3", linetype= 2) #SPR 2016 year
+
+# depending on randomness Grock and Dsole are either the same fishing rate or different by one factor i.e. either .008 or .016
 
 ```
 
