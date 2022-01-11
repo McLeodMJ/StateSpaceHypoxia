@@ -6,6 +6,8 @@
 #'                       "Grock"
 #################################################################
 
+### DSOLE HAS TWO EXTRA PARAMETERS, MAKE SURE THIS IS DONE CORRECTLY..
+
 params <- function(sp){
   # Female Parameters
   if(sp == "Dsole" | sp == 1){
@@ -15,7 +17,7 @@ params <- function(sp){
     R0.sd = 0.35, #fixed
     steep = 0.8, 
     S0 = 469866,
-    f = Sp_depl[Sp_depl$Species == "Dsole",3], #hybrid page 315 -0.04
+    f = Sp_depl[Sp_depl$Species == "Dsole",3],# derived from SPR analysis - 'fishing_rate.R'
     fec.const = 0.000002805, #linear to weight
     fec.exp = 3.345,
     fec.int =1, #1
@@ -55,7 +57,7 @@ params <- function(sp){
       R0.sd = 0.16454, #have 95% CI
       steep = 0.7,
       S0 = 37974, #unit is mt
-      f = Sp_depl[Sp_depl$Species == "Lingcod",3] , #webplot digit page 238 -0.117
+      f = Sp_depl[Sp_depl$Species == "Lingcod",3] , # derived from SPR analysis - 'fishing_rate.R'
       fec.const = 0.00000276,
       fec.exp = 3.28,
       fec.int =1,
@@ -92,7 +94,7 @@ params <- function(sp){
       R0.sd = 0.15, # 95 CI: 2073-109,131
       steep = 0.69,
       S0 = 37947,
-      f = Sp_depl[Sp_depl$Species == "Grock",3] , #pope page 228 -0.1
+      f = Sp_depl[Sp_depl$Species == "Grock",3] , # derived from SPR analysis - 'fishing_rate.R'
       fec.const = 371200, #fec. intercept PAGE 17 & 54
       fec.exp = 63300, #fec. slope
       fec.int =1, #1 
@@ -137,7 +139,7 @@ params <- function(sp){
       R0.sd = 0.15, #95 ci: 17.86-134.94 mil
       steep = 0.718,
       S0 = 14.996, #trillion eggs
-      f = Sp_depl[Sp_depl$Species == "Yrock",3] , # page 22 expl. rate - 0.01169 [ Andi Stephens confirmed 2/25/21 that it is pope's eqn & recorde as exp.]
+      f = Sp_depl[Sp_depl$Species == "Yrock",3] , # derived from SPR analysis - 'fishing_rate.R'
       fec.const = 1.1185e-11,
       fec.exp = 4.59,
       fec.int =1, #0
