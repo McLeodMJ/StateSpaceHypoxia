@@ -1,153 +1,146 @@
 ####################################
 # particle filter function
 #' dat: simulated IPM data --> equilibrium
-#' Nact: actual data from the WCGBTS [if checking work - then this is 2nd run of IPM]
+#' Nact: actual data from the WCGBTS [if checking if p.filter works - then this is 2nd run of IPM]
+#' selc: F means we are running simulations and do NOT need the WCGBTS selc- T means we need WCGBTS selc. 
 #' fish: "Dsole", "Lingcod", "Yrock", "Grock" to call param for species of interest
-#' fi: fishing rate - pars$f generally fits to call from param() fxn
+#' fi: fishing rate - take fishing rate found from SPR Analysis OR pars$f generally fits to call from param() fxn
 #' hypox: hypoxia parameter - need to adjust for MCMC
-#' selc: includes WCGBTS selectivity. if do not want to include selc = NA
 #' mesh: mesh size - defines nrows in matrix
 #' Q: no. of particles 
 #' time: running iterations to this time
-#' cv: variation for recruitment variation
+#' rec_var: variation for recruitment variation
 #' cv_q: random variation introduced for each particle 
-#' sigma_p: variation for prcoess error
-
-#####################################
-### PraCTICE IF WORKS
-
-# load("../Data/Hist_spp.Rdata")
-# load("./Results/Expected_Fishing_rate.Rdata")
-# source("./Library/params.R")
-# source("./Library/kernmat.R")
-# source("./Library/fecmat.R")
-# Sp_selex <- read.csv("../Data/Sp.selex.csv") 
-
+#' sigma_p: variation for process error
+#' scale: used to reduce pop sizes down to more realistic values per trawl - best scale = 0.00001
 
 #######################################
 
-p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var, cv_q, sigma_p){
+p.filter <- function(dat, hypox_p, fi, cv_q, sigma_p, scale, rec1, rec2, rec3, rec4, rec5, rec6, rec7, rec8, rec9, rec10, rec11, rec12, rec13, rec14, rec15, rec16, rec17, rec18, rec19, rec20){
+
+# return data from list
+ Nact = dat$N.act
+ Nint = dat$Nint
+ hypox = dat$DO 
+ fish = dat$fish
+ mesh = dat$Mesh
+ Q = dat$Q
+ time = dat$time
+ rec_var = c(rec1, rec2, rec3, rec4, rec5, rec6, rec7, rec8, rec9, rec10, rec11, rec12, rec13, rec14, rec15, rec16, rec17, rec18, rec19, rec20)
+  
+  
+  # format data to be scaled down to more realistic sizes
+  Nint <- Nint * scale
+  Nact <- round(Nact * scale)
   
   # Particle filter: (following Knape & deValpine 2012)
-  N <- matrix(NA, nrow = nrow(dat), ncol = time)
+  N <- matrix(NA, nrow = mesh, ncol = time)
   
   # Generate Q particles (independent simulations of N):
-  Nf <- array(rep(NA, nrow(N) * time * Q), c(nrow(N), time, Q)) #pop.dist. x time x particles
-  Nf[,1,] <- dat[,time] #saves last column of equil. data
+  Nf <- array(rep(NA, mesh * time * Q), c(mesh, time, Q)) #pop.dist. x time x particles
+  Nf[,1,] <- Nint #inputs the last column of pop. equil. data
   
   # Simulate random variation for first particle
-  Nf[,1,] <- Nf[,1,] + rnorm(nrow(N), 0, cv_q * dat[,time])
+   part_sims <- rnorm(length(Nf[,1,]), 0, cv_q)
+  dim(part_sims) <- dim(Nf[,1,]) 
+  Nf[,1,] <- Nf[,1,] + part_sims
   Nf[Nf<0] = 0 # check for all values greater than zero 
   
-  # Step 1: Initialize the model 
+  
+# Step 1: Initialize the model 
     # resample for accuracy
+    Avg.likel <- rep(NA, time) #average of the ftmp
+    likel <- matrix(NA, nrow=mesh, ncol= Q)
     ftmp <- matrix(NA, nrow= time, ncol = Q)
-    Avg.likel <- rep(0, time) #average of the ftmp
     ftmp[1,] <- rep(1, Q)
     Wgt = cumsum(ftmp[1,]/ sum(ftmp[1,]))  
     Rnd = runif(Q)
-    Wgt = matrix(Wgt, nrow=Q, ncol=Q) # same across row?
-    Rnd =  t(matrix(Rnd, nrow=Q, ncol=Q)) # same across column?
-    Pass <- matrix(Rnd < Wgt, nrow=Q, ncol= Q)
-    Ind = Q - colSums(Pass) + 1
+    Wgt = matrix(Wgt, nrow=Q, ncol=Q) # same across row
+    Rnd =  t(matrix(Rnd, nrow=Q, ncol=Q)) # same across column
+    Pass <- matrix(Rnd < Wgt, nrow=Q, ncol= Q) # logical T or F for if the random value is less than the weighted value
+    Ind = Q - colSums(Pass) + 1 #pulls the best representable samples 
     
-  Nf[,1,] <- Nf[ ,1, Ind] # replace with resampled values -- based on Ind variable that pulls the best representable samples 
+  Nf[,1,] <- Nf[ ,1, Ind] # replace with resampled values
   
   Ind2 = sample(1:Q, 1) # index so must be less than 100
   N[,1] = Nf[,1,Ind2] # pick one randomly to be *the* distribution to carry forward to the next step
   
-  ## Step 2: simulate encounters for Null or absences based on hypoxia parameter 
-  
-  #threshold -50
-  #occ.full.2 <- det + inv_logit(hypox * hypox_p) #linear dep. on hypoxia
-  # may want to replace data with simulated pop and set a threshold
-  # threshold is blanket greater .5 then it is true. [check the hypox for if larger is 0 or 1]
-  
-  # for loop but of occ.full.2 
-  #for(i in 1:time){
-   # if(occ.full.2[i] <= 0.89){
-    #  ftmp[i,] <- rep(NA, Q) # think its due to hypox replace zero observ. moments with -999 [true zero =]
-    #}}
-  
-  ## Step 3: run model through time T 
-    # Create the kernel:
+  ## Step 2: create the operating model
+    
+  # calls parameters from SS
     pars <- params(fish)
     
+    # integration
     meshmax = pars$Linf * 2
-    x <- seq(from = 1, to = meshmax, length.out = mesh)
+    x <- seq(from = 0, to = meshmax, length.out = mesh)
     dx = diff(x)[1]
     
   ## size distribution of recruits
   Rvec <- dnorm(x, pars$Rlen, pars$Rlen.sd)  
   
-  K <- kernmat(x, pars, fi)
+  # Create the kernel
+  K <- kernmat(x, pars, exp(fi)) # very small...
   Fe <- fecmat(x, pars)
   
+  # process error
+  Nrand <- rnorm(length(Nf[,1,]), 0, exp(sigma_p)) 
+  dim(Nrand) <- dim(Nf[,1,])
+  #Nrand = matrix(rnorm(mesh * Q, 0 , sigma_p), mesh, Q) #processs error
+  
+  # Detection parameter dependent on hypoxia parameter and DO data
+  det <- inv_logit(hypox * hypox_p)
+  
+  # WCGBTS Selectivity
+    WClen <- 1 # does NOT add trawl selc. 
+ 
+  
+ ## Step 3: run model through time T 
+  Recruits <- NULL
   for (t in 2:time){
     
     # Advance the model, one particle at a time
     for(q in 1:Q){
-      Nrand = matrix(rnorm(mesh * Q, 0 , sigma_p), mesh, Q) #processs error
-      
       # integration
       Nf[,t,q] <- K %*% Nf[,t-1,q]  * dx  # midpoint rule integration
-      E <- sum(Fe * Nf[,t-1,q]) * dx 
+      E <- sum(Fe * Nf[,t-1, q] * dx )
       
       # Beverton-holt density-depedence
-      Recruits <- as.vector((4 * pars$steep * exp(pars$R0) * E) / ((pars$S0 * (1 - pars$steep)) + (E * (5 * pars$steep - 1))))
-      # Add variation in recruitment 
-      
-      #RR <- exp(rnorm(1, mean = log(Recruits) - ((cv * log(Recruits))^2)/2, sd= cv * log(Recruits) ))# change cv to 0 for no variation
-      
-      Nf[,t, q] = Nf[,t, q] + rec_var[t] * (Rvec * Recruits) + Nrand[ ,q]  # move the model forward for each particle 
-    #  Nf(:,t,q) = kmat*Nf(:,t-1,q) + RR + Nrand(:,:,q);  % Eq 2 from White et al. PLoS ONE
+      Recruits[t] <- as.vector((4 * pars$steep * exp(pars$R0) * E)/ ((pars$S0 * (1 - pars$steep)) + (E * (5 * pars$steep - 1))) ) 
+      # THIS gives a reasonable value but does it make sense to apply this way??? - as.vector((4 * pars$steep * exp(pars$R0*scale)* E)/ ((pars$S0*scale * (1 - pars$steep)) + (E * (5 * pars$steep - 1))) ) 
+       Nf[,t, q] = Nf[,t, q] +  exp(rec_var[t] + log(Rvec * Recruits[t])) + Nrand[ ,q] # add var. in recruitment
+        Nf[Nf < 0] = 0
     
-      } # end of Q loop
-    Nf[Nf < 0] = 0
+        
+    ### site by year analysis 
+        
+    ############################### LIKELIHOOD ############################
+    pois_mle <- data.frame(lambda_vals = Nf[,t,q] * dx * WClen) %>%
+      rowwise() %>%
+      mutate(log_likelihood = pois.likel(y = Nact[,t], lambda = lambda_vals)) %>%
+      ungroup() # avoids issues with dpois() over vectorized data
     
-    # WCGBTS Selectivity
-      WClen <- pars$selc
+    likel[,q] <- pois_mle$log_likelihood
+  } # end of Q loop
+    likel[which(!is.finite(likel))] <- log(1e-320) # smallest non-infinite value
+    
       
-      ############################### LIKELIHOOD ############################
-      det <- inv_logit(hypox * hypox_p)
-      
-      likel <-dpois(Nact[,t], Nf[,t,] * dx * WClen, log= T)
-      #= sum(log(max(realmin,poisspdf(repmat(Nact(:,t),[1,1,Q]),(NT(t-length(Tpre))*dy*Nf(:,t,:)).*repmat(OKlen(:),[1,1,Q])))));
-      likel[which(!is.finite(likel))] <- 0
-      # eqn we worked through on 9/1
-      #ftmp[t,] = colSums(likel) * occ.full.2 + (1 - occ.full.2) * (sum(Nact[,t]) == 0)  #log-likelihood vector
-      ### eqn 1
-      #ftmp[t,] = ifelse(sum(Nact[,t]) == 0, (1 - occ.full.2), colSums(likel) * occ.full.2 )  #log-likelihood vector
-      ### eqn 2/3
-      #likel_b <- dbinom(x = Nact[,t], size = Nf[,t,], prob = det[t])
+      ## factoring in detection parameter to likelihood data
        if(sum(Nact[,t]) == 0){ 
          # absent
-        ftmp[t,] <- colSums(likel) * c(1 - det[t])
+        ftmp[t,] <- colSums(likel,na.rm=TRUE) * c(1 - det[t]) / c(sum(det) * time)
         }else{
           #present
-         ftmp[t,] <- colSums(likel) * det[t]
+         ftmp[t,] <- colSums(likel,na.rm=TRUE) * det[t] /c(sum(det) * time)
         }
+      # shoud detection be going through a likelihood function of its own or just multiplying by the poislike is fine??
       Avg.likel[t] = mean(ftmp[t,])
+      Avg.likel[which(!is.finite(Avg.likel))] <- log(1e-320) # smallest non-infinite value
       
-      ### alternative LLs
-      #likel_b = c(log( det[t] + exp(log(1 - det[t]) + 1)))
-      #likel_p = log(1 - det[t]) + colSums(dpois(Nact[,t], Nf[,t,] * dx * WClen, log= T))
-     
-    
-      # check - put in true parameters values from process model and check that it gives a higher likelihood for those over the recruitment was half of that year, fi- is 50% higher 
-      
-      
-    # if negative binomial would be better THAN POISON
-      #likel = dnbinom(x = Nact[,t], size = occ.full.2, mu = Nf[,t,] * dx * WClen, log= T)
-      #size is target for no. of successful trials ???
-      # cannot do p instead of size 
-      
- 
    ## Step 4: Resample    
     Wgt = cumsum(ftmp[t,]/ sum(ftmp[t,]))
     Rnd = runif(Q)
-    Wgt = matrix(Wgt, nrow=Q, ncol=Q) # same across row?
-    Rnd =  t(matrix(Rnd, nrow=Q, ncol=Q)) # same across column?
+    Wgt = matrix(Wgt, nrow=Q, ncol=Q) # same across row
+    Rnd =  t(matrix(Rnd, nrow=Q, ncol=Q)) # same across column
     Pass = matrix(Rnd < Wgt, nrow=Q, ncol= Q)
     Ind = Q - colSums(Pass) + 1
     
@@ -156,11 +149,12 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
     N[,t] = Nf[,t,Ind2] # pick one randomly to be *the* distribution to carry forward to the next step
     } # end of t loop
   
-
-  Pfilter_data <- list(likelihood = Avg.likel,
-                         Pop = N)
+  Pfilter_data <- list(likelihood = -1 *sum(Avg.likel, na.rm = T),
+                       Fit = N,
+                       True=Nact,
+                       recruits = Recruits)
   
-  return(Pfilter_data)
+  return(Pfilter_data$likelihood)
 }
 # dat = Pop.eq$Pop.matrix
 # Nact = Pop.sim
@@ -175,5 +169,5 @@ p.filter <- function(dat, Nact, hypox, fish, hypox_p, fi, mesh, Q, time, rec_var
 # rec_var = rep(0.1, time)
 # cv_q = 0.1
 # sigma_p = 0.1
-
- 
+# scale = 0.00001
+# 
