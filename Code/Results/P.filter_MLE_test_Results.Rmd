@@ -1,0 +1,138 @@
+---
+title: "Pfilter.Results"
+author: "Montana McLeod"
+date: "1/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "~/Documents/THESIS/StateSpaceHypoxia/Code/Library")
+```
+
+
+# load/ libraries and data
+```{r}
+library(ggplot2)
+library(viridis)
+library(tidyverse)
+#load data from MLE2 for each test parameter - make into a dataframe
+
+# find the average 
+Avgs_list <- list(sigma_0.001 = MLE_test_sigma_output1,
+        sigma_0.01 = MLE_test_sigma_output2,
+        sigma_0.1 = MLE_test_sigma_output3,
+        sigma_0.5 = MLE_test_sigma_output4,
+        sigma_2 = MLE_test_sigma_output5)
+
+Avgs_lists <- list(sigma_0.001 = MLE_test_sigma_output.1,
+                  sigma_0.01 = MLE_test_sigma_output.2,
+                  sigma_0.1 = MLE_test_sigma_output.3,
+                  sigma_0.5 = MLE_test_sigma_output.4,
+                  sigma_2 = MLE_test_sigma_output.5)
+
+```
+
+
+# Output with replicates 
+```{r}
+# placeholders to save the coefs and averages across replicates
+avgs <- matrix(NA, nrow = (length(Avgs_list)+5), ncol = 24)
+tots <- NULL
+
+# extract coeficeints from each iteration and find the mean of each test
+for(l in 1:length(Avgs_list)){
+  tots <- NULL
+  for (z in 1:5){
+  zz <- coef(Avgs_list[[l]][[z]])
+  tots <-rbind(tots, zz)
+  }
+  avgs[(l),] <- colMeans(tots)
+}
+
+for(l in 1:length(Avgs_lists)){
+  tots <- NULL
+  for (z in 1:7){
+    zz <- coef(Avgs_lists[[l]][[z]])
+    tots <-rbind(tots, zz)
+  }
+  avgs[(l+5),] <- colMeans(tots)
+}
+avgs = avgs[, c(1:2, 4:24)]
+
+
+# since I broke up the for loop to be quicker
+Avgs <- matrix(NA, nrow = length(Avgs_list), ncol = 23)
+for (l in 1:5){
+  Avgs[l,] <- colMeans(avgs[c(l, (l+5)), ]) 
+}
+summ <- data.frame( Estimate = c(Avgs[1,], Avgs[2,], Avgs[3,], Avgs[4,], Avgs[5,]))
+summ$Param <- rep(c("hypox_p", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"),5)
+```
+
+
+# if adjusting the fi & hypox param each iteration
+```{r}
+# modify df to have true values & param combos
+values <- NULL
+test_chr <- NULL
+for(tt in 1:5){
+  val <- c(test_params[tt,1], exp(test_params[tt,2]), 0.01, rep(0.1, 20))
+  values <- c(values, val)
+  chr <- paste("(",test_params[tt,1],")", "(",exp(test_params[tt,2]),")", sep="")
+  test_chr <- c(test_chr, chr)
+}
+summ$Estimate <- ifelse(summ$Param != "hypox_p", exp(summ$Estimate), summ$Estimate)
+
+summ$Bias <- ((summ$Estimate - values) / summ$Estimate) *100
+summ$Test <- rep(test_chr, each = 23)
+
+```
+
+
+# if adjusting the level of sigma each iteration 
+```{r}
+# modify df to have true values & param combos
+values <- NULL
+test_chr <- NULL
+for(tt in 1:5){
+  val <- c(params_log[1,1], exp(params_log[1,2]), exp(params_log[tt,3]), rep(0.1, 20))
+  values <- c(values, val)
+  chr <- paste("(",exp(params_log[tt,3]),")", sep="")
+  test_chr <- c(test_chr, chr)
+}
+ summ$Estimate <- ifelse(summ$Param != "hypox_p", exp(summ$Estimate), summ$Estimate)
+
+summ$Bias <- ((summ$Estimate - values) / summ$Estimate) *100
+summ$Test <- rep(test_chr, each = 23)
+
+```
+
+
+#plot for point estimates
+```{r}
+# df of the true param values 
+true <- data.frame(Estimate = c(test_params[1,1], exp(test_params[1,2]), 0.5, rep(0.1, 20)),
+                   Param = c("hypox_p", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"))
+
+
+#point plot to show how it ranges with the true value
+ggplot(summ, aes(Param, Estimate, color=Test))+
+  geom_point(position = "jitter")+
+  viridis::scale_color_viridis(discrete=T)+
+  geom_point(data=true, color="red", shape= 2, size = 1)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) 
+## 4, 1.009 is true values
+
+```
+
+# heat map 
+```{r}
+# heat map that shows bias of the estimate from true values
+ggplot(summ, aes(Param, Test)) +
+  viridis::scale_color_viridis(discrete=F)+
+  geom_tile(aes(fill = Bias), colour = "white") +
+  scale_fill_gradient2(low = "white", mid = "darkgreen", high = "white")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+
+```
