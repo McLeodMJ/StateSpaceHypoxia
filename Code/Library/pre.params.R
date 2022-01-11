@@ -107,7 +107,7 @@ pre.params <- function(sp){
       Mat.slp = -0.66, #p. 207
       selc.50 = 21,# p. 68 L50%
       selc.100 = 28, # p. 68 L100%
-      depl = 0.814, #page 8 in decimal of %
+      depl = 0.814, #table b - page V in decimal of %
       selc.p1 = 26.77,  # Dbl Norm. table 33 p. 74
       selc.p2 = NA, 
       selc.p3 = 4.03, 
