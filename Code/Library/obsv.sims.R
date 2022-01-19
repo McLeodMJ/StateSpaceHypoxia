@@ -3,7 +3,7 @@
 #setwd("~/Box Sync/McLeod_thesis/Code")
 
 #Load MCMC files/ fxns
-#load("../Data/DO_sims.Rdata")
+# load("../Data/DO_sims.Rdata")
 #load("./Results/Priors_fromNO_Hypox.Rdata") # summ - priors from MCMC bias runs [occ & det]?
 #source("./Library/inv.logit.R")
 
@@ -25,7 +25,7 @@
 #' selec : selectivity of the trawl - F when simulating data & T when calling selec from param.R 
 
 
-obsv.sims <- function(DO_data, fish, hypox_p, fi_spp, selec){
+obsv.sims <- function(DO_data, fish, hypox_a, hypox_b, fi_spp, selec){
 
   #format DO_data by preferred length
 DO = spline(DO_data$Sim_DO_matrix[9,],n=20)$y
@@ -46,12 +46,12 @@ Pop.var.R <- IPM(fish, fi_spp, time, mesh, Pop.eq$SAD, rep(log(0.1), time)) #IPM
 Pop.samp <- round(Pop.var.R$Pop.matrix)
 
 ## hypoxia dependence
-det = inv_logit(DO * hypox_p) # detection is depen. on hypoxia and hypox param.
+det <- inv_logit(hypox * hypox_a + hypox_b)# detection is depen. on hypoxia and hypox param.
 pres <- rbinom(time, 1, det) # pres/abs sims.
 
 #logit plot of probability of detection
-  #obs <- cbind(DO, det)
-  #plot(obs, ylim = c(0,1), type='l')
+ # obs <- cbind(DO, det)
+ # plot(obs, ylim = c(0,1))
 
 # Take poisson sample dist. of population 
 Pop.sim <- rpois(length(Pop.samp), Pop.samp) # sample of pop serves as mean

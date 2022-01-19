@@ -5,7 +5,8 @@
 #' selc: F means we are running simulations and do NOT need the WCGBTS selc- T means we need WCGBTS selc. 
 #' fish: "Dsole", "Lingcod", "Yrock", "Grock" to call param for species of interest
 #' fi: fishing rate - take fishing rate found from SPR Analysis OR pars$f generally fits to call from param() fxn
-#' hypox: hypoxia parameter - need to adjust for MCMC
+#' hypox_a: dep. hypoxia parameter - based on 1.43 threshold for hypoxia - hypoxa=7/1.43 --> hypox_b= 4.9
+#' hypox_b: intercept hypoxia parameter - if DO = 0 & prob is very low [0.001] logit(0.001/.999) --> hypox_b = -7
 #' mesh: mesh size - defines nrows in matrix
 #' Q: no. of particles 
 #' time: running iterations to this time
@@ -16,9 +17,11 @@
 
 #######################################
 
-p.filter.WCGBTS <- function(dat, nact, hypox, hypox_p, fi, cv_q, sigma_p, scale, rec1, rec2, rec3, rec4, rec5){
+p.filter.WCGBTS <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2, rec3, rec4, rec5){
   # return data from list
   Nint = dat$Nint #inputs the last column of steady state pop.
+  nact = dat$N.act
+  hypox = dat$DO
   fish = dat$fish
   mesh = dat$Mesh
   Q = dat$Q
@@ -44,7 +47,7 @@ p.filter.WCGBTS <- function(dat, nact, hypox, hypox_p, fi, cv_q, sigma_p, scale,
   y=1
     hyp <- hypox[[y]]$mean_hyp
     # Detection parameter dependent on hypoxia parameter and DO data
-    det <- inv_logit(hyp * hypox_p)
+    det <- inv_logit(hyp * hypox_a + hypox_b)
     
     #population by year
     Nact <- nact[[y]]

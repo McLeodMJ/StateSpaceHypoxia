@@ -5,7 +5,8 @@
 #' selc: F means we are running simulations and do NOT need the WCGBTS selc- T means we need WCGBTS selc. 
 #' fish: "Dsole", "Lingcod", "Yrock", "Grock" to call param for species of interest
 #' fi: fishing rate - take fishing rate found from SPR Analysis OR pars$f generally fits to call from param() fxn
-#' hypox: hypoxia parameter - need to adjust for MCMC
+#' hypox_a: dep. hypoxia parameter - based on 1.43 threshold for hypoxia - hypoxa=7/1.43 --> hypox_b= 4.9
+#' hypox_b: intercept hypoxia parameter - if DO = 0 & prob is very low [0.001] logit(0.001/.999) --> hypox_b = -7
 #' mesh: mesh size - defines nrows in matrix
 #' Q: no. of particles 
 #' time: running iterations to this time
@@ -16,7 +17,7 @@
 
 #######################################
 
-p.filter <- function(dat, hypox_p, fi, cv_q, sigma_p, scale, rec1, rec2, rec3, rec4, rec5, rec6, rec7, rec8, rec9, rec10, rec11, rec12, rec13, rec14, rec15, rec16, rec17, rec18, rec19, rec20){
+p.filter <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2, rec3, rec4, rec5, rec6, rec7, rec8, rec9, rec10, rec11, rec12, rec13, rec14, rec15, rec16, rec17, rec18, rec19, rec20){
 
 # return data from list
  Nact = dat$N.act
@@ -88,7 +89,7 @@ p.filter <- function(dat, hypox_p, fi, cv_q, sigma_p, scale, rec1, rec2, rec3, r
   #Nrand = matrix(rnorm(mesh * Q, 0 , sigma_p), mesh, Q) #processs error
   
   # Detection parameter dependent on hypoxia parameter and DO data
-  det <- inv_logit(hypox * hypox_p)
+  det <- inv_logit(hypox * hypox_a + hypox_b)
   
   # WCGBTS Selectivity
     WClen <- 1 # does NOT add trawl selc. 

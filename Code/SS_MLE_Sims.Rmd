@@ -96,7 +96,7 @@ test = 5
 log_start <- list(hypox_p = params_log[1,1],
                          fi = params_log[1,2],
                          cv_q = 0.1,
-                         sigma_p = params_log[test,3],
+                         sigma_p = params_log[,3],
                          rec1 =  log(0.1),
                          rec2 =  log(0.1),
                          rec3 =  log(0.1),
@@ -229,7 +229,7 @@ print(start_time)
                          upper = upp,
                          control=list(maxit=2000, trace=TRUE))
 print(Final_SS_std)
-print(paste("(",test_params[test,1],")", "(",exp(test_params[test,2]),")", sep=""))
+print(paste("(",test_params[test,1],")", "(",exp(test_params[test,2]),")","-",(i),"-iter", sep=""))
  end_time <- Sys.time()
  end_time - start_time
  
