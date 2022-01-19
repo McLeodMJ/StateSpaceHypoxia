@@ -20,7 +20,8 @@
 # OBSERVATION MODEL 
 #' DO_data : DO data from newport moorings or DO from wcgbts for real data
 #' fish : fish of interest - Dsole, Ling, Yrock, Grock
-#' hypox_p : param for hypoxia threshold 
+#' hypox_a: dep. hypoxia parameter - based on sim. results that give at least 4 sim. absences - hypox_a= 3
+#' hypox_b: intercept hypoxia parameter - if DO = 0 & prob is very low [0.001] logit(0.001/.999) --> hypox_b = -7
 #' fi_spp : fishing rate dependent on spp. - if we want to fix fi, then make "NA" and it will call fi from the sp_depl.csv 
 #' selec : selectivity of the trawl - F when simulating data & T when calling selec from param.R 
 
@@ -46,9 +47,9 @@ Pop.var.R <- IPM(fish, fi_spp, time, mesh, Pop.eq$SAD, rep(log(0.1), time)) #IPM
 Pop.samp <- round(Pop.var.R$Pop.matrix)
 
 ## hypoxia dependence
-det <- inv_logit(hypox * hypox_a + hypox_b)# detection is depen. on hypoxia and hypox param.
+det <- inv_logit(DO * hypox_a + hypox_b) # detection is depen. on hypoxia and hypox param.
 pres <- rbinom(time, 1, det) # pres/abs sims.
-
+pres
 #logit plot of probability of detection
  # obs <- cbind(DO, det)
  # plot(obs, ylim = c(0,1))
