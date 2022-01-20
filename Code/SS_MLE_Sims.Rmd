@@ -131,7 +131,7 @@ SS_MLE.sigma <- mle2(minuslogl =  p.filter, #p.filter.wcbgts
                  method = "L-BFGS-B",
                   lower = low, 
                  upper = upp,
-                 control=list(maxit=2000, trace=TRUE))
+                 control=list(maxit=2000, trace=5))
 
 print(SS_MLE.sigma)
 print(paste("(",exp(params_log[test,3]),")", sep = ""))
@@ -175,22 +175,25 @@ library(broom)
  upp <-c("hypox_p" = Inf, "fi" = Inf, "sigma_p"= Inf, "rec1"= Inf, "rec2"= Inf, "rec3"= Inf, "rec4"= Inf, "rec5"= Inf, "rec6"= Inf, "rec7"= Inf, "rec8"= Inf, "rec9"= Inf, "rec10"= Inf, "rec11"= Inf,"rec12"= Inf, "rec13"= Inf, "rec14"= Inf, "rec15"= Inf, "rec16"= Inf, "rec17"= Inf, "rec18"= Inf, "rec19"= Inf, "rec20"= Inf)
  
    # test parameters over MCMC
- test_params <- cbind( c(rep(0.4, 3), 0.1, 4, 8),  # hypox
-                      c(log(pars$f), log(0.001), log(0.2), rep(log(pars$f), 3))) #fi
+ test_params <- cbind( c(rep(3, 5), 0.1, 6),  # hypox_a
+                       c(rep(-7, 3), -1, -10, rep(-7, 2)), #hypox_b
+                      c(log(pars$f), log(0.001), log(0.2), rep(log(pars$f), 4))) #fi
  
  
  # store results
- test_param_output.6 <- vector("list", length = 5)
- names(test_param_output.6) <- 1:5
+# test_param_output.6 <- vector("list", length = 5)
+ #names(test_param_output.6) <- 1:5
  
  
-for(i in 1:5){
+#for(i in 1:5){
  #simulate data with changing fi or hypox.p
- test = 6
-  Dsole_data <- obsv.sims(bad_yr, "Dsole", test_params[test,1], test_params[test,2], F)
+ test = 1
+ i=2
+  Dsole_data <- obsv.sims(bad_yr, "Dsole", test_params[test,1], test_params[test,2], test_params[test,3], F)
   
-log_start <- list(hypox_p = test_params[test,1],
-                         fi = test_params[test,2],
+log_start <- list(hypox_a = test_params[test,1],
+                         hypox_b = test_params[test,2],
+                         fi = test_params[test,3],
                          cv_q = 0.1,
                          sigma_p = log(0.5),
                          rec1 =  log(0.1),
@@ -219,7 +222,7 @@ log_start <- list(hypox_p = test_params[test,1],
 start_time <- Sys.time()
 print(start_time)
 
- Final_SS_std <- mle2(minuslogl =  p.filter, #p.filter.wcbgts
+ MLE_hy.a_6.2 <- mle2(minuslogl =  p.filter, #p.filter.wcbgts
                          start = log_start,
                          fixed = list(cv_q = 0.1),
                          data = list(dat = Dsole_data,
@@ -227,41 +230,178 @@ print(start_time)
                          method = "L-BFGS-B",
                          lower = low, 
                          upper = upp,
-                         control=list(maxit=2000, trace=TRUE))
-print(Final_SS_std)
-print(paste("(",test_params[test,1],")", "(",exp(test_params[test,2]),")","-",(i),"-iter", sep=""))
+                         control=list(maxit=2000, trace=6))
+print(MLE_hy.a_6.2)
+print(paste("(",test_params[test,1],")", "(",test_params[test,2],")", "(",exp(test_params[test,3]),")", "-",(i),"-iter", sep=""))
  end_time <- Sys.time()
  end_time - start_time
  
- test_param_output.6[[i]] <- Final_SS_std
- }
+ #test_param_output.6[[i]] <- Final_SS_std
+ #}
 
-save(test_param_output.6, file ="./Results/MLE_test_param_output.6.Rdata")
+save(MLE_hy.a_6.2, file ="./Results/MLE_hy.a_6.2.Rdata")
+
+```
+
+
+# run to check p.filter 
+```{r}
+source("IPM.R")
+source("params.R")
+source("kernmat.R")
+source("fecmat.R")
+source("p.filter.NO.det.R")
+source("obsv.sims.R")
+#source("MH.MCMC.R")
+Sp_selex <- read.csv("Sp.selex.csv") 
+load("DO_sims.Rdata")
+load("Expected_Fishing_rate.Rdata") #from the SPR vs fishing values ## F priors
+
+library(invgamma)
+library(bbmle)
+library(tidyverse)
+library(dplyr)
+#library(mcreplicate)
+library(httr)
+library(broom)
+# define parameters of Dsole
+
+ pars <- params("Dsole")
+
+ low <-c("hypox_p" = -Inf, "fi" = -Inf, "sigma_p"= -Inf, "rec1"= -Inf, "rec2"= -Inf, "rec3"= -Inf, "rec4"= -Inf, "rec5"= -Inf, "rec6"= -Inf, "rec7"= -Inf, "rec8"= -Inf, "rec9"= -Inf, "rec10"= -Inf, "rec11"= -Inf,"rec12"= -Inf, "rec13"= -Inf, "rec14"= -Inf, "rec15"= -Inf, "rec16"= -Inf, "rec17"= -Inf, "rec18"= -Inf, "rec19"= -Inf, "rec20"= -Inf)
+ upp <-c("hypox_p" = Inf, "fi" = Inf, "sigma_p"= Inf, "rec1"= Inf, "rec2"= Inf, "rec3"= Inf, "rec4"= Inf, "rec5"= Inf, "rec6"= Inf, "rec7"= Inf, "rec8"= Inf, "rec9"= Inf, "rec10"= Inf, "rec11"= Inf,"rec12"= Inf, "rec13"= Inf, "rec14"= Inf, "rec15"= Inf, "rec16"= Inf, "rec17"= Inf, "rec18"= Inf, "rec19"= Inf, "rec20"= Inf)
+ 
+   # test parameters over MCMC
+ test_params <- cbind( c(rep(3, 5), 0.1, 6),  # hypox_a
+                       c(rep(-7, 3), -1, -10, rep(-7, 2)), #hypox_b
+                      c(log(pars$f), log(0.001), log(0.2), rep(log(pars$f), 4))) #fi
+ 
+ 
+ # store results
+# test_param_output.6 <- vector("list", length = 5)
+ #names(test_param_output.6) <- 1:5
+ 
+ 
+#for(i in 1:5){
+ #simulate data with changing fi or hypox.p
+ test = 1
+ i=2
+Dsole_data <- obsv.sims(bad_yr, "Dsole", test_params[test,1], test_params[test,2], test_params[test,3], F)
+  
+log_start <- list(fi = test_params[test,3],
+                         cv_q = 0.1,
+                         sigma_p = log(0.5),
+                         rec1 =  log(0.1),
+                         rec2 =  log(0.1),
+                         rec3 =  log(0.1),
+                         rec4 =  log(0.1),
+                         rec5 =  log(0.1),
+                         rec6 =  log(0.1),
+                         rec7 =  log(0.1),
+                         rec8 =  log(0.1),
+                         rec9 =  log(0.1),
+                         rec10 = log(0.1),
+                         rec11 = log(0.1),
+                         rec12 = log(0.1),
+                         rec13 = log(0.1),
+                         rec14 = log(0.1),
+                         rec15 = log(0.1),
+                         rec16 = log(0.1),
+                         rec17 = log(0.1),
+                         rec18 = log(0.1),
+                         rec19 = log(0.1),
+                         rec20 = log(0.1))
+
+
+# neg. LL for fxn that contains pre & post-molt LL's
+start_time <- Sys.time()
+print(start_time)
+
+ MLE_NO_det.2 <- mle2(minuslogl =  p.filter.NO.det, #p.filter.wcbgts
+                         start = log_start,
+                         fixed = list(cv_q = 0.1),
+                         data = list(dat = Dsole_data,
+                                     scale = 1),
+                         method = "L-BFGS-B",
+                         lower = low, 
+                         upper = upp,
+                         control=list(maxit=2000, trace=6))
+print(MLE_NO_det.2)
+
+ end_time <- Sys.time()
+ end_time - start_time
+ 
+ #test_param_output.6[[i]] <- Final_SS_std
+ #}
+
+save(MLE_NO_det.2, file ="./Results/MLE_NO_det.2.Rdata")
 
 ```
 
 
 
 
-
-
+# run with real data
 ```{r}
-listt <- vector("list", length =5)
-for(i in 1:5){
-x <- 0:10
-y <- sample(1:12, 11)
-d <- data.frame(x,y)
+source("IPM.R")
+source("params.R")
+source("kernmat.R")
+source("fecmat.R")
+source("p.filter.WCGBTS.R")
+Sp_selex <- read.csv("Sp.selex.csv") 
 
-## in general it is best practice to use the `data' argument,
-##  but variables can also be drawn from the global environment
-LL <- function(ymax=15, xhalf=6){
-    -sum(stats::dpois(y, lambda=ymax/(1+x/xhalf), log=TRUE))
-}
-## uses default parameters of LL
-fit <- mle2(LL)
-listt[[i]] <-fit
-}
-listt
+load("Nact_DO.Rdata")
+load("Nact_site_yr.Rdata")
+load("All_spp_p.filter.Rdata")
+load("Expected_Fishing_rate.Rdata") #from the SPR vs fishing values ## F priors
+
+library(invgamma)
+library(bbmle)
+library(tidyverse)
+library(dplyr)
+library(httr)
+library(broom)
+##############################
+
+# define parameters of Dsole
+fish = "Dsole"
+ pars <- params(fish)
+
+ low <-c("hypox_p" = -Inf, "fi" = -Inf, "sigma_p"= -Inf, "rec1"= -Inf, "rec2"= -Inf, "rec3"= -Inf, "rec4"= -Inf, "rec5"= -Inf, "rec6"= -Inf, "rec7"= -Inf, "rec8"= -Inf, "rec9"= -Inf, "rec10"= -Inf, "rec11"= -Inf,"rec12"= -Inf, "rec13"= -Inf, "rec14"= -Inf, "rec15"= -Inf, "rec16"= -Inf, "rec17"= -Inf, "rec18"= -Inf, "rec19"= -Inf, "rec20"= -Inf)
+ upp <-c("hypox_p" = Inf, "fi" = Inf, "sigma_p"= Inf, "rec1"= Inf, "rec2"= Inf, "rec3"= Inf, "rec4"= Inf, "rec5"= Inf, "rec6"= Inf, "rec7"= Inf, "rec8"= Inf, "rec9"= Inf, "rec10"= Inf, "rec11"= Inf,"rec12"= Inf, "rec13"= Inf, "rec14"= Inf, "rec15"= Inf, "rec16"= Inf, "rec17"= Inf, "rec18"= Inf, "rec19"= Inf, "rec20"= Inf)
+ 
+
+log_start <- list(hypox_p = 1.43, 
+                         fi = log(pars$f),
+                         cv_q = 0.1,
+                         sigma_p = log(0.5),
+                         rec1 =  log(0.1),
+                         rec2 =  log(0.1),
+                         rec3 =  log(0.1),
+                         rec4 =  log(0.1),
+                         rec5 =  log(0.1))
+
+
+# neg. LL for fxn that contains pre & post-molt LL's
+start_time <- Sys.time()
+print(start_time)
+
+ Dsole_MLE <- mle2(minuslogl =  p.filter.WCGBTS, #p.filter.wcbgts
+                         start = log_start,
+                         fixed = list(cv_q = 0.1),
+                         data = list(dat = Dsole_dat,
+                                     scale = 1),
+                         method = "L-BFGS-B",
+                         lower = low, 
+                         upper = upp,
+                         control=list(maxit=2000, trace=6))
+print(Dsole_MLE)
+end_time <- Sys.time()
+ end_time - start_time
+
+
+save(Dsole_MLE, file ="./Results/Dsole_MLE.Rdata")
+
 ```
 
 
