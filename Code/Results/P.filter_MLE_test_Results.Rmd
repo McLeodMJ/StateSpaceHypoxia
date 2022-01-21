@@ -47,12 +47,22 @@ Avgs_param_lists <- list(fi_0.008.hypox_0.4 = test_param_output1,
         hypox_0.1 = test_param_output4,
         hypox_4 = test_param_output5,
         hypox_8 = test_param_output6)
+
+
+Avgs_param_list3 <- list(MLE_std = MLE_std,
+        fi_0.001 = MLE_fi_0.001,
+        fi_0.2 = MLE_fi_0.2,
+        hypox.b_1 = MLE_hy.b_1,
+        hypox_.b10 = MLE_hy.b_10,
+        hypox.a_0.1 = MLE_hy.a_0.1,
+        hypox.a_6 = MLE_hy.a_6)
 ```
 
 
 ## OPTION 1
-# if adjusting the fi & hypox param each iteration
+# if adjusting the fi & hypox_p param each iteration
 ```{r}
+
 # placeholders to save the coefs and averages across replicates
 avgs <- matrix(NA, nrow = (length(Avgs_param_list)+6), ncol = 24)
 tots <- NULL
@@ -76,7 +86,7 @@ for(l in 1:length(Avgs_param_lists)){
   }
   avgs[(l+6),] <- colMeans(tots) 
 }
-avgs = avgs[, c(1:2, 4:24)]
+avgs = avgs[, c(1:2,4:24)]
 
 
 # since I broke up the for loop to be quicker need to take average of those two averaged values
@@ -96,13 +106,16 @@ test_chr <- NULL
 for(tt in 1:6){
   val <- c(test_params[tt,1], exp(test_params[tt,2]), 0.5, rep(0.1, 20))
   values <- c(values, val)
-  chr <- paste("(",test_params[tt,1],")", "(",exp(test_params[tt,2]),")", sep="")
+  chr <- paste("(",test_params[tt,1],")",  "(",exp(test_params[tt,2]),")", sep="")
   test_chr <- c(test_chr, chr)
 }
 summ$Estimate <- ifelse(summ$Param != "hypox_p", exp(summ$Estimate), summ$Estimate)
 
 summ$Bias <- ((summ$Estimate - values) / summ$Estimate) *100
 summ$Test <- rep(test_chr, each = 23)
+
+true <- data.frame(Estimate = c(test_params[1,1],exp(test_params[1,2]), 0.5, rep(0.1, 20)),
+                   Param = c("hypox_p", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"))
 
 ```
 
@@ -160,20 +173,61 @@ for(tt in 1:5){
 summ$Bias <- ((summ$Estimate - values) / summ$Estimate) *100
 summ$Test <- rep(test_chr, each = 23)
 
+true <- data.frame(Estimate = c(test_params[1,1],exp(test_params[1,2]), 0.5, rep(0.1, 20)),
+                   Param = c("hypox_p", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"))
 ```
 
+# option 3
+# for the new patameter estimates, hypox_a, hypox_b and fi
+```{r}
+test_params <- cbind( c(rep(3, 5), 0.1, 6),  # hypox_a
+                       c(rep(-7, 3), -1, -10, rep(-7, 2)), #hypox_b
+                      c(log(pars$f), log(0.001), log(0.2), rep(log(pars$f), 4))) #fi
+ 
+# placeholders to save the coefs and averages across replicates
+avgs <- matrix(NA, nrow = (length(Avgs_param_list3)), ncol = 25)
+
+# extract coeficeints from each iteration and find the mean of each test
+for(l in 1:length(Avgs_param_list3)){
+  avgs[l,] <- coef(Avgs_param_list3[[l]])
+  }
+avgs = avgs[, c(1:3, 5:25)]
+
+
+# since I broke up the for loop to be quicker
+#Avgs <- matrix(NA, nrow = length(Avgs_sigma_list), ncol = 23)
+#for (l in 1:6){
+#  Avgs[l,] <- colMeans(avgs[c(l, (l+5)), ])
+#}
+summ <- data.frame( Estimate = c(avgs[1,], avgs[2,], avgs[3,], avgs[4,], avgs[5,] , avgs[6,], avgs[7,])) 
+summ$Param <- rep(c("hypox_a","hypox_b", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"), 7) 
+
+# modify df to have true values & param combos
+values <- NULL
+test_chr <- NULL
+for(tt in 1:7){
+  val <- c(test_params[tt,1],test_params[tt,2], exp(test_params[tt,3]), 0.5, rep(0.1, 20))
+  values <- c(values, val)
+  chr <- paste("(",test_params[tt,1],")", "(",test_params[tt,2],")", "(",exp(test_params[tt,3]),")", sep="")
+  test_chr <- c(test_chr, chr)
+}
+summ$Estimate <- ifelse(summ$Param != "hypox_a" & summ$Param != "hypox_b" , exp(summ$Estimate), summ$Estimate)
+
+summ$Bias <- ((summ$Estimate - values) / summ$Estimate) *100
+summ$Test <- rep(test_chr, each = 24)
+
+true <- data.frame(Estimate = c(test_params[1,1],test_params[1,2], exp(test_params[1,3]), 0.5, rep(0.1, 20)),
+                   Param = c("hypox_a","hypox_b", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"))
+```
 
 
 
 #plot for point estimates
 ```{r}
 # df of the true param values 
-true <- data.frame(Estimate = c(test_params[1,1], exp(test_params[1,2]), 0.5, rep(0.1, 20)),
-                   Param = c("hypox_p", "fi", "sigma_p", "rec1", "rec2", "rec3", "rec4", "rec5", "rec6", "rec7", "rec8", "rec9","rec10", "rec11","rec12", "rec13", "rec14", "rec15", "rec16", "rec17", "rec18", "rec19", "rec20"))
-
 
 #point plot to show how it ranges with the true value
-ggplot(summ, aes(Param, Estimate, color=Test))+
+ggplot(summ[summ$Bias <100,], aes(Param, Estimate, color=Test))+
   geom_point(position = "jitter")+
   viridis::scale_color_viridis(discrete=T)+
   geom_point(data=true, color="red", shape= 2, size = 1)+
@@ -185,10 +239,10 @@ ggplot(summ, aes(Param, Estimate, color=Test))+
 # heat map 
 ```{r}
 # heat map that shows bias of the estimate from true values
-ggplot(summ, aes(Param, Test)) +
+ggplot(summ[summ$Bias <100,], aes(Param, Test)) +
   viridis::scale_color_viridis(discrete=F)+
   geom_tile(aes(fill = Bias), colour = "white") +
-  scale_fill_gradient2(low = "white", mid = "darkgreen", high = "white")+
+  scale_fill_gradient2(low = "darkred", mid = "orange", high = "darkgreen", midpoint=0)+
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
 
 ```
