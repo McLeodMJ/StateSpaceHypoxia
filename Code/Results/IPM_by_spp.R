@@ -17,6 +17,11 @@ df <- data.frame( Time = rep(c(50:time), 4),
                   Pop.Size =  rep(NA, length(c(50:time)*4 )),
                   Equil = rep(NA, length(c(50:time)*4 )))
 
+N0_all_spp <- data.frame("Lingcod" = rep(NA, 200),
+                         "Yrock" = rep(NA, 200),
+                         "Grock" = rep(NA, 200),
+                         "Dsole" = rep(NA, 200))
+
 for (f in fish){
     
     pars <- params(f)
@@ -55,6 +60,7 @@ for (f in fish){
     } #end of model
     
     N0 <- N[,time] # save SAD
+    N0_all_spp[,f] <- N0
     equil <- colSums(N[ ,50:time])
     df[df$Type == f, 4] <- equil
     
@@ -106,3 +112,4 @@ y <- ggplot(df[df$Type =="Yrock", ], aes(Time, Pop.Size))+
 
 (l | g) / (y | d) #organize plots
 
+#save(N0_all_spp, file="../Data/All_spp_Nint.Rdata")
