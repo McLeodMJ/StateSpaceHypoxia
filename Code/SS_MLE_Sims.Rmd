@@ -175,10 +175,8 @@ library(broom)
  upp <-c("hypox_p" = Inf, "fi" = Inf, "sigma_p"= Inf, "rec1"= Inf, "rec2"= Inf, "rec3"= Inf, "rec4"= Inf, "rec5"= Inf, "rec6"= Inf, "rec7"= Inf, "rec8"= Inf, "rec9"= Inf, "rec10"= Inf, "rec11"= Inf,"rec12"= Inf, "rec13"= Inf, "rec14"= Inf, "rec15"= Inf, "rec16"= Inf, "rec17"= Inf, "rec18"= Inf, "rec19"= Inf, "rec20"= Inf)
  
    # test parameters over MCMC
- test_params <- cbind( c(rep(3, 5), 0.1, 6),  # hypox_a
-                       c(rep(-7, 3), -1, -10, rep(-7, 2)), #hypox_b
-                      c(log(pars$f), log(0.001), log(0.2), rep(log(pars$f), 4))) #fi
- 
+ test_params <- cbind( c(rep(0.4, 3), 0.1, 4, 8),  # hypox_p
+                      c(log(pars$f), log(0.001), log(0.2), rep(log(pars$f), 3))) #fi
  
  # store results
 # test_param_output.6 <- vector("list", length = 5)
@@ -266,7 +264,7 @@ library(httr)
 library(broom)
 # define parameters of Dsole
 
- pars <- params("Dsole")
+ pars <- params("Yrock")
 
  low <-c("hypox_p" = -Inf, "fi" = -Inf, "sigma_p"= -Inf, "rec1"= -Inf, "rec2"= -Inf, "rec3"= -Inf, "rec4"= -Inf, "rec5"= -Inf, "rec6"= -Inf, "rec7"= -Inf, "rec8"= -Inf, "rec9"= -Inf, "rec10"= -Inf, "rec11"= -Inf,"rec12"= -Inf, "rec13"= -Inf, "rec14"= -Inf, "rec15"= -Inf, "rec16"= -Inf, "rec17"= -Inf, "rec18"= -Inf, "rec19"= -Inf, "rec20"= -Inf)
  upp <-c("hypox_p" = Inf, "fi" = Inf, "sigma_p"= Inf, "rec1"= Inf, "rec2"= Inf, "rec3"= Inf, "rec4"= Inf, "rec5"= Inf, "rec6"= Inf, "rec7"= Inf, "rec8"= Inf, "rec9"= Inf, "rec10"= Inf, "rec11"= Inf,"rec12"= Inf, "rec13"= Inf, "rec14"= Inf, "rec15"= Inf, "rec16"= Inf, "rec17"= Inf, "rec18"= Inf, "rec19"= Inf, "rec20"= Inf)
@@ -285,7 +283,7 @@ library(broom)
 #for(i in 1:5){
  #simulate data with changing fi or hypox.p
  test = 1
- i=2
+ i=1
 Dsole_data <- obsv.sims(bad_yr, "Dsole", test_params[test,1], test_params[test,2], test_params[test,3], F)
   
 log_start <- list(fi = test_params[test,3],
@@ -317,7 +315,7 @@ log_start <- list(fi = test_params[test,3],
 start_time <- Sys.time()
 print(start_time)
 
- MLE_NO_det.2 <- mle2(minuslogl =  p.filter.NO.det, #p.filter.wcbgts
+ MLE_NO_det.Yrock <- mle2(minuslogl =  p.filter.NO.det, #p.filter.wcbgts
                          start = log_start,
                          fixed = list(cv_q = 0.1),
                          data = list(dat = Dsole_data,
