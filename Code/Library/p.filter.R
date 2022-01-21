@@ -5,7 +5,7 @@
 #' selc: F means we are running simulations and do NOT need the WCGBTS selc- T means we need WCGBTS selc. 
 #' fish: "Dsole", "Lingcod", "Yrock", "Grock" to call param for species of interest
 #' fi: fishing rate - take fishing rate found from SPR Analysis OR pars$f generally fits to call from param() fxn
-#' hypox_a: dep. hypoxia parameter - based on 1.43 threshold for hypoxia - hypoxa=7/1.43 --> hypox_b= 4.9
+#' hypox_a: dep. hypoxia parameter - based on the det. prob. that gives at least 4 zeros when run through rbinom() hypox_a=3
 #' hypox_b: intercept hypoxia parameter - if DO = 0 & prob is very low [0.001] logit(0.001/.999) --> hypox_b = -7
 #' mesh: mesh size - defines nrows in matrix
 #' Q: no. of particles 
