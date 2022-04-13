@@ -19,12 +19,14 @@ source("./Library/IPM.R")
 source("./Library/p.filter.R")
 source("./Library/inv.logit.R")
 
+rec_dev <- rnorm(time,0,0.1)
 
-Pop_IPM_eq <- IPM("Dsole", Dsole_f, 100, 200, NA, 0) # run IPM once to get to equilibrium 
-Pop_IPM_var <- IPM("Dsole",Dsole_f, 100, 200, Pop_IPM_eq$SAD, 0.01) # run IPM to include recruitment variation and use N0 from first IPM run [N0 is N[,time] from first IPM run]
+Pop_IPM_eq <- IPM("Dsole", Dsole_f, 100, 200, NA, rep(0,200)) # run IPM once to get to equilibrium 
+Pop_IPM_var <- IPM("Dsole",Dsole_f, 100, 200, Pop_IPM_eq$SAD, rep(0.1,200)) # run IPM to include recruitment variation and use N0 from first IPM run [N0 is N[,time] from first IPM run]
 Pop_var <- round(Pop_IPM_var$Pop.matrix)
 
-Pfil_Out <- p.filter(Pop_IPM_eq$Pop.matrix, Pop_var, DO_data, 1, 4, Dsole_f, 200, 100, 100, 0.01, 0.1, 0.1) # particle filter using 1st IPM runs data to initialize the model and 2nd IPM run as the Nact data
+Pfil_Out <- p.filter(Pop_IPM_eq$Pop.matrix, Pop_var, DO_data, F, 1, 4, Dsole_f, 200, 100, 100, rec_dev, 0.1, 0.1, 1) # particle filter using 1st IPM runs data to initialize the model and 2nd IPM run as the Nact data
+#update tp new p.filter requirements ^^^^
 
 par(mfrow=c(1,2))
 plot(colSums(Pfil_Out$Pop), type='l'); plot(colSums(Pop_var), type='l') 
