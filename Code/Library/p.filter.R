@@ -28,11 +28,11 @@ p.filter <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2
  Q = dat$Q
  time = dat$time
  rec_var = c(rec1, rec2, rec3, rec4, rec5, rec6, rec7, rec8, rec9, rec10, rec11, rec12, rec13, rec14, rec15, rec16, rec17, rec18, rec19, rec20)
-  
-  
+ 
   # format data to be scaled down to more realistic sizes
   Nint <- Nint * scale
   Nact <- round(Nact * scale)
+  
   
   # Particle filter: (following Knape & deValpine 2012)
   N <- matrix(NA, nrow = mesh, ncol = time)
@@ -50,7 +50,7 @@ p.filter <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2
   
 # Step 1: Initialize the model 
     # resample for accuracy
-    Avg.likel <- rep(NA, time) #average of the ftmp
+    Avg.likel <- rep(NA, time-1) #average of the ftmp
     likel <- matrix(NA, nrow=mesh, ncol= Q)
     ftmp <- matrix(NA, nrow= time, ncol = Q)
     ftmp[1,] <- rep(1, Q)
@@ -91,13 +91,19 @@ p.filter <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2
   # Detection parameter dependent on hypoxia parameter and DO data
   det <- inv_logit(hypox * hypox_a + hypox_b)
   
+  # prevent det from going to 0 or 1
+  det[det < 1e-6] <- 1e-6
+  det[det > (1-1e-6)] <- (1-1e-6)
+  
+  
   # WCGBTS Selectivity
     WClen <- 1 # does NOT add trawl selc. 
  
   
  ## Step 3: run model through time T 
   Recruits <- NULL
-  for (t in 2:time){
+  likel.NA <- NULL
+  for(t in 2:time){
     
     # Advance the model, one particle at a time
     for(q in 1:Q){
@@ -115,16 +121,30 @@ p.filter <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2
     ### site by year analysis 
         
     ############################### LIKELIHOOD ############################
-    pois_mle <- data.frame(lambda_vals = Nf[,t,q] * dx * WClen) %>%
-      rowwise() %>%
-      mutate(log_likelihood = pois.likel(y = Nact[,t], lambda = lambda_vals)) %>%
-      ungroup() # avoids issues with dpois() over vectorized data
-    
-    likel[,q] <- pois_mle$log_likelihood
+ # pois_mle <- data.frame(lambda_vals = Nf[,t,q] * dx * WClen) %>%
+ #   rowwise() %>%
+ #   mutate(log_likelihood = pois.likel(y = Nact[,t], lambda = lambda_vals)) %>%
+ #   ungroup() # avoids issues with dpois() over vectorized data
+ # likel[,q] <- pois_mle$log_likelihood
+  
+    likel[,q] <- dpois(x=Nact[,t], lambda = Nf[,t,q] * dx * WClen, log=T)
   } # end of Q loop
-    likel[which(!is.finite(likel))] <- log(1e-320) # smallest non-infinite value
     
-      
+    #alt# likel[which(!is.finite(likel))] <- -1e308
+    
+    #alt2 # if we want to just make the Inf values NA 
+    # code to record if Inf or -Inf were detected b4 moving on
+    #inf.likel <-table(!is.finite(colSums(likel)))
+   #likel.NA[t] <- ifelse(length(inf.likel) > 1, T, F)
+    #likel[which(!is.finite(likel))] <- NA
+    
+    like.min <- min(likel[is.finite(likel)], na.rm = T) 
+    #add ifelse statement for when bounds are reached and entire likel matrix returns NaNs, like.min will return Inf
+    if(like.min == Inf){
+      like.min = -1e50
+    }
+    likel[which(!is.finite(likel))] <-  like.min 
+    
       ## factoring in detection parameter to likelihood data
        if(sum(Nact[,t]) == 0){ 
          # absent
@@ -134,28 +154,39 @@ p.filter <- function(dat, hypox_a, hypox_b, fi, cv_q, sigma_p, scale, rec1, rec2
          ftmp[t,] <- colSums(likel,na.rm=TRUE) * det[t] /c(sum(det) * time)
         }
       # shoud detection be going through a likelihood function of its own or just multiplying by the poislike is fine??
-      Avg.likel[t] = mean(ftmp[t,])
-      Avg.likel[which(!is.finite(Avg.likel))] <- log(1e-320) # smallest non-infinite value
-      
+      Avg.likel[t-1] = mean(ftmp[t,])
+     
    ## Step 4: Resample    
-    Wgt = cumsum(ftmp[t,]/ sum(ftmp[t,]))
-    Rnd = runif(Q)
+    Wgt = cumsum(na.omit(ftmp[t,])/ sum(ftmp[t,], na.rm =T))
+    Rnd = na.omit(runif(Q))
     Wgt = matrix(Wgt, nrow=Q, ncol=Q) # same across row
     Rnd =  t(matrix(Rnd, nrow=Q, ncol=Q)) # same across column
     Pass = matrix(Rnd < Wgt, nrow=Q, ncol= Q)
     Ind = Q - colSums(Pass) + 1
-    
+ 
     Nf[,t,] <- Nf[ ,t, Ind] # replace with resampled values
     Ind2 = sample(1:Q, 1)
     N[,t] = Nf[,t,Ind2] # pick one randomly to be *the* distribution to carry forward to the next step
     } # end of t loop
   
-  Pfilter_data <- list(likelihood = -1 *sum(Avg.likel, na.rm = T),
+ #1st alternative approach to dealing with -Inf   
+ #alt# if(sum(Avg.likel) < -1e300){
+ #alt#   NLL <- -1 *-1e308
+ #alt# }else {
+ #alt#   NLL <- -1 *sum(Avg.likel, na.rm = T)
+  #atl# } <- NA # smallest non-infinite value
+   
+   NLL <- -1 *sum(Avg.likel, na.rm = T)
+  #alt2 # NLL <- ifelse(length(table(likel.NA == T)) > 1, -1e308, NLL) # if true, there is an INF value so make avg likel inf
+  #print(NLL)
+  
+   
+  Pfilter_data <- list(likelihood = NLL,
                        Fit = N,
                        True=Nact,
                        recruits = Recruits)
   
-  return(Pfilter_data$likelihood)
+  return(Pfilter_data)
 }
 # dat = Pop.eq$Pop.matrix
 # Nact = Pop.sim
