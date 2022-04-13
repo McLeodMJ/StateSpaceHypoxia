@@ -5,8 +5,8 @@
 -- DO measurements have been routinely collected on the West Coast Groundfish Slope/Shelf Bottom Trawl Survey beginning in 2009 and continue through the present.
 
 -- Haul Characteristics
-https://www.nwfsc.noaa.gov/data/api/v1/source/trawl.operation_haul_fact/selection.csv?filters=project=Groundfish Slope and Shelf Combination Survey,year>2014,year<2016&variables=project,trawl_id,operation_dim$operation_type,performance,latitude_dd,longitude_dd,year,date_yyyymmdd,depth_m,temperature_at_gear_c_der,o2_at_gear_ml_per_l_der,year_stn_invalid
+https://www.webapps.nwfsc.noaa.gov/data/api/v1/source/trawl.operation_haul_fact/selection.csv?filters=project=Groundfish Slope and Shelf Combination Survey,year>2009,year<2018&variables=project,trawl_id,operation_dim$operation_type,performance,latitude_dd,longitude_dd,year,date_yyyymmdd,depth_m,temperature_at_gear_c_der,o2_at_gear_ml_per_l_der,year_stn_invalid
 
 
 -- Specimens
-https://www.nwfsc.noaa.gov/data/api/v1/source/trawl.individual_fact/selection.csv?filters=project=Groundfish Slope and Shelf Combination Survey,year>2014,year<2016&variables=project,trawl_id,operation_dim$operation_type,latitude_dd,longitude_dd,best_available_taxonomy_dim$grp_reg_depth_category,best_available_taxonomy_dim$order_40,scientific_name,common_name,partition,length_cm,length_type,width_cm,width_type,net_touchdown_time,net_liftoff_time,sampling_start_hhmmss,sampling_end_hhmmss,depth_m,year,year_stn_invalid
+https://www.webapps.nwfsc.noaa.gov/data/api/v1/source/trawl.individual_fact/selection.csv?filters=project=Groundfish Slope and Shelf Combination Survey,year>2009,year<2016&variables=project,trawl_id,operation_dim$operation_type,latitude_dd,longitude_dd,best_available_taxonomy_dim$grp_reg_depth_category,best_available_taxonomy_dim$order_40,scientific_name,common_name,partition,length_cm,length_type,width_cm,width_type,sex,net_touchdown_time,net_liftoff_time,sampling_start_hhmmss,sampling_end_hhmmss,depth_m,year,year_stn_invalid
