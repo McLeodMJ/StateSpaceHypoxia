@@ -5,47 +5,47 @@
 #'                       "Yrock", 
 #'                       "Grock"
 #################################################################
-
+## 2021 updated params
 ### DSOLE HAS TWO EXTRA PARAMETERS, MAKE SURE THIS IS DONE CORRECTLY..
+
 
 params <- function(sp){
   # Female Parameters
   if(sp == "Dsole" | sp == 1){
    Params <- list(
     name = "Dsole",
-    R0 = 12.85,  #unfished R0 - ln(r0) or # 380777 recruits
-    R0.sd = 0.35, #fixed
-    steep = 0.8, 
-    S0 = 469866,
+    R0 = 12.27,  #unfished R0 - ln(r0) or # 213096 recruits
+    R0.sd = 0.35, #fixed still?
+    steep = 0.8, #78  
+    S0 = 294070, # biomass mt
     f = Sp_depl[Sp_depl$Species == "Dsole",3],# derived from SPR analysis - 'fishing_rate.R'
-    fec.const = 0.000002805, #linear to weight
-    fec.exp = 3.345,
-    fec.int =1, #1
-    fec.slp = 3,#0 gm-slope p# 314
-    M = 0.1165,
-    M.sd = 0.0056,
-    K = 0.1497,
-    K.sd = 0.0078,
-    Linf = 47.81,
-    Linf.cv = 0.114,
-    Rlen = 5.405,
-    Rlen.sd = 0.094 * 5.405, 
-    Mat.len = 35,  #p. 34
-    Mat.slp = -0.775, # page 314
-    selc.50 = 35,  # pg.35 length at 50% mature
-    selc.100 = 50, # page 100 figure 26
-    depl = 0.837,#page 7
-    selc.p1 = 33.120,  # Dbl Norm. table 21 p. 66 [peak at .6 then odd decline]
-    selc.p2 = 1.697, 
-    selc.p3 = 3.928, 
-    selc.p4 = 0.665,
-    selc.p5 = NA,
-    selc.p6 = 1.844,
-    selc.F.p4 = -0.723,
-    selc.F.p6 = -1.455,
-    bin.len = 65,# page 37 & 207 of assessment
+    fec.const = 0, #linear to weight #78 
+    fec.exp = 3.3432, #78 
+    fec.int =1, ##78 
+    fec.slp = 3,##78 
+    M = 0.108, #78
+    M.sd = NA,#78 
+    K = 0.132,#78 
+    K.sd = 0.0042,#78 
+    Linf = 48.05,
+    Linf.cv = 0.156, #78
+    Rlen = 7.99,
+    Rlen.sd = 0.652, #78 
+    Mat.len = 32.84,  #p. 78
+    Mat.slp = -0.278, # 78
+    selc.50 = 35,  # previous SA values 2011- length at 50% mature (2021 did not estimate)
+    selc.100 = 50, # previous SA values 2011- length at 100% mature (2021 did not estimate)
+    depl = 0.789,# report.sso at year 2021
+    selc.p1 = 33.6908,  # Dbl Norm. table 21 p. 66 [see user manual & report.sso]
+    selc.p2 = -2.9683, 
+    selc.p3 = 4.07705, 
+    selc.p4 = -0.815268 + 3.01256, #see user manual : female selecivity as a fraction of male selec.
+    selc.p5 = -10,
+    selc.p6 = 1.0491 + -0.951736,
+    selc.fem.scaled = 0.648895, # prortion to males - peak is actucally at 0.6488 instead of 1
+    bin.len = 60,# page 77  of assessment
     bin.wth = 1,
-    selc = spline(Sp_selex$Dsole, n=200)$y)
+    selc = Sp_selex$Dsole * Sp_selex$Dsole_fem_scale[1] )
     
   }
   
@@ -56,7 +56,7 @@ params <- function(sp){
       R0 = 9.0669, #ln(r0) // #8037
       R0.sd = 0.16454, #have 95% CI
       steep = 0.7,
-      S0 = 37974, #unit is mt
+      S0 = 37974, #unit is biomass mt
       f = Sp_depl[Sp_depl$Species == "Lingcod",3] , # derived from SPR analysis - 'fishing_rate.R'
       fec.const = 0.00000276,
       fec.exp = 3.28,
@@ -93,7 +93,7 @@ params <- function(sp){
       R0 = 9.62,# - ln(R0) // 15041 recruits
       R0.sd = 0.15, # 95 CI: 2073-109,131
       steep = 0.69,
-      S0 = 37947,
+      S0 = 7090, #37947, million eggs
       f = Sp_depl[Sp_depl$Species == "Grock",3] , # derived from SPR analysis - 'fishing_rate.R'
       fec.const = 371200, #fec. intercept PAGE 17 & 54
       fec.exp = 63300, #fec. slope
@@ -112,13 +112,6 @@ params <- function(sp){
       selc.50 = 21,# p. 68 L50%
       selc.100 = 28, # p. 68 L100%
       depl = 0.814, #page 8 in decimal of %
-      selc.p1 = 26.77,  # Dbl Norm. table 33 p. 74
-      selc.p2 = NA, 
-      selc.p3 = 4.03, 
-      selc.p4 = NA,
-      selc.p5 = -4.68,
-      selc.p6 = NA,
-      
       selc.p1 = 21,  # p 214 the table of params [init] - asymp.
       selc.p2 = 3, 
       selc.p3 = 3.7, 
@@ -127,7 +120,7 @@ params <- function(sp){
       selc.p6 = -999,
       bin.len = 45, #max length page 145
       bin.wth = 1,
-      selc = spline(Sp_selex$Grock, n=200)$y) 
+      selc = Sp_selex$Grock ) 
     
   }
   
@@ -138,7 +131,7 @@ params <- function(sp){
       R0 = 10.83, # ln(R0) // 49090000 recruits
       R0.sd = 0.15, #95 ci: 17.86-134.94 mil
       steep = 0.718,
-      S0 = 14.996, #trillion eggs
+      S0 = 14.996, #trillion eggs page 16
       f = Sp_depl[Sp_depl$Species == "Yrock",3] , # derived from SPR analysis - 'fishing_rate.R'
       fec.const = 1.1185e-11,
       fec.exp = 4.59,
@@ -165,7 +158,7 @@ params <- function(sp){
       selc.p6 = -999 ,
       bin.len = 65, # found in YTRK.north.data.ss
       bin.wth = 1,
-      selc = spline(Sp_selex$Yrock, n=200)$y)
+      selc = Sp_selex$Yrock )
    }
   return(Params)
 }
