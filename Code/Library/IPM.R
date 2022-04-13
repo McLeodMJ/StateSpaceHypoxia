@@ -48,6 +48,7 @@ IPM <- function (fish, fi, time, mesh, N0, rec_var){
     } 
   
     Recruits <- NULL
+    RR <- NULL
   ### Run the model
   for (t in 2:time){
     N[,t] <- K %*% N[,t-1]  * dx  # midpoint rule integration
@@ -57,8 +58,10 @@ IPM <- function (fish, fi, time, mesh, N0, rec_var){
     # BH eqn: (Methot and Tylor 2011 - eqn A.7)
       # Ry = 4h*R0*Eggs / S0(1-h) + Eggs(5h -1)
     Recruits[t] <- as.vector( (4 * pars$steep * exp(pars$R0) * E) / ((pars$S0 * (1 - pars$steep)) + (E * (5 * pars$steep - 1))) )
-    #RR <- exp(rnorm(1, mean = rec_var[t] * log(Recruits) - ((rec_var[t] * log(Recruits))^2)/2, sd= rec_var[t] * log(Recruits) ))# change cv to 0 for no variation
-    N[,t] = N[,t] + exp(rec_var[t] + log(Rvec * Recruits[t])) 
+    RR[t] <- exp(rnorm(1, mean = log(Recruits[t]) - ((rec_var[t] * log(Recruits[t]))^2)/2, sd= rec_var[t] * log(Recruits[t]) )) # exp() was removed # change cv to 0 for no variation
+    N[,t] = N[,t] + RR[t] * Rvec
+    N[N < 0] = 0
+    
   } #end of model
   
    N0 <- N[,time] # save SAD
