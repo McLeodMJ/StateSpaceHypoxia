@@ -19,17 +19,18 @@
 ####################################  Format data ####################################
 # OBSERVATION MODEL 
 #' DO_data : DO data from newport moorings or DO from wcgbts for real data
+#' ti : how many DO datapts to extract which equates to years
 #' fish : fish of interest - Dsole, Ling, Yrock, Grock
 #' hypox_a: dep. hypoxia parameter - based on sim. results that give at least 4 sim. absences - hypox_a= 3
 #' hypox_b: intercept hypoxia parameter - if DO = 0 & prob is very low [0.001] logit(0.001/.999) --> hypox_b = -7
 #' fi_spp : fishing rate dependent on spp. - if we want to fix fi, then make "NA" and it will call fi from the sp_depl.csv 
 #' selec : selectivity of the trawl - F when simulating data & T when calling selec from param.R 
 
-
-obsv.sims <- function(DO_data, fish, hypox_a, hypox_b, fi_spp, selec){
+# argument for recruitment varaiation 
+obsv.sims <- function(DO_data, ti, fish, hypox_a, hypox_b, fi_spp, selec, rec_var){
 
   #format DO_data by preferred length
-DO = spline(DO_data$Sim_DO_matrix[9,],n=20)$y
+DO = spline(DO_data$Sim_DO_matrix[9,],n=ti)$y
 time = length(DO)
 mesh = 200
 Q = 100
@@ -43,13 +44,15 @@ fi_spp = log(fi_spp)
 
 ### Operating model wtih IPM 
 Pop.eq <- IPM(fish, fi_spp, time, mesh, NA, rep(0, time)) # run IPM once to get to equilibrium 
-Pop.var.R <- IPM(fish, fi_spp, time, mesh, Pop.eq$SAD, rep(log(0.1), time)) #IPM w/ recruitment variation
+Pop.var.R <- IPM(fish, fi_spp, time, mesh, Pop.eq$SAD, rep(rec_var,time)) #IPM w/ recruitment variation
 Pop.samp <- round(Pop.var.R$Pop.matrix)
+#par(mfrow=c(1,2)); plot(colSums(Pop.eq$Pop.matrix), type='l'); plot(colSums(Pop.var.R$Pop.matrix), type='l')
+
 
 ## hypoxia dependence
 det <- inv_logit(DO * hypox_a + hypox_b) # detection is depen. on hypoxia and hypox param.
 pres <- rbinom(time, 1, det) # pres/abs sims.
-pres
+#pres
 #logit plot of probability of detection
  # obs <- cbind(DO, det)
  # plot(obs, ylim = c(0,1))
@@ -80,7 +83,7 @@ Data_log <- list(Q = Q,
      hypox_a = hypox_a, #normal dist.
      hypox_b = hypox_b, #normal dist.
      fi = fi_spp, #log-normal
-     rec_var = rep(log(0.1), time), #log-normal
+     rec_var = rec_var, #log-normal
      sigma.p = log(0.5), #log-normal
      prior_mu = c(0, 0.1, 0, 0.1), #hypox, fi, rec_var, sigma.p
      prior_sd = c(10, 0.1, 0.1, NA))
