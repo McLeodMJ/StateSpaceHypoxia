@@ -5,12 +5,14 @@ load("DO_sims.Rdata")
 
 
 
-ggplot(dat_NA[dat_NA$year %in% 2010:2018, ], aes(Jday, DO, color=year))+
+ggplot(dat_NA[dat_NA$year %in% 2010:2015, ], aes(Jday, DO, color=year))+
   geom_line()+
   scale_fill_brewer(palette = "Accent")+
   facet_wrap(~year, 4)+
   geom_hline(yintercept = 1.43, color= "red")+
   ggtitle("Summertime DO at a bottom mooring off Newport")+
+  xlab("Julian Days")+
+  ylab("DO Concentrations")+
   guides(color="none")
 
 
