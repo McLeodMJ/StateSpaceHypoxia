@@ -22,7 +22,7 @@ library(tidyr)
 # Raw Data
 ```{r}
 sp_dat <- read.csv("../Data/Species.csv", stringsAsFactors = FALSE) #ALL data btw 2009-2019 of ALL species
-  sp_data <- sp_dat[ ,c(3,5:6,8,17:18,21)] # only the important variables
+  sp_data <- sp_dat[ ,c(3,5:6,8,16:18,21)] # only the important variables
   sp_data$year <- as.numeric(sp_data$year)
   sp_data <- sp_data[order(sp_data$year), ] # order the data set by Year
   
@@ -30,6 +30,7 @@ sp_dat <- read.csv("../Data/Species.csv", stringsAsFactors = FALSE) #ALL data bt
 haul_data <- read.csv("../Data/Haul.csv", stringsAsFactors = FALSE)
   haul_data <- haul_data[ ,c(1:5,9:11)]
   haul_data <- haul_data[order(haul_data$year), ]
+  haul_data <- haul_data[haul_data$year %in% 2010:2015,]
   colnames(haul_data)[colnames(haul_data) == "date_yyyymmdd"] <- "Date" #change name of date
   
 Total_sp_data <- merge(sp_data, haul_data, by = c("trawl_id", "year",  "latitude_dd", "longitude_dd"), all = TRUE)  # merge data to be both datasets
@@ -45,8 +46,8 @@ Total_sp_data <- Total_sp_data %>%
       "September", "October", "November", "December"),
     ordered = TRUE)) #Sets the Month to automatically order via month order [lubridate package]
 
-Total_sp_data <- Total_sp_data[ ,c(1,8,2,12, 3:7, 10:11)] #reorganize 
-Total_sp_data <- Total_sp_data[Total_sp_data$year %in% 2010:2014 & Total_sp_data$latitude_dd >= 43.8041, ] #remove year w/0 lengths
+Total_sp_data <- Total_sp_data[ ,c(1,8:9,2,12, 3:7, 10:11)] #reorganize 
+Total_sp_data <- Total_sp_data[Total_sp_data$latitude_dd >= 43.8041, ] #remove year w/0 lengths
 ```
 
 
@@ -168,25 +169,17 @@ act.data <- function(data, source.dat, x){
   Nact <- matrix(-999, nrow = length(x), ncol = length(trawls)) # store new dataset aggregrated across trawls and size densitites 
   
   for (w in 1:length(trawls)){
-    h.dat <- hist(data[data$trawl_id == trawls[w], 7], breaks= c(x,Inf), plot = F)$count # creates densities by trawls
-    Nact[,w] <- h.dat 
-  
-    #BELOW IS FOR DENSITY REQUIREMENTS BUT WE NEED COUNTS(?)
-    # report trawl-ids as NA not as 0 present
-    #for(n in 1:length(x)){
-    #if(is.nan(Nact[n,w]) | is.na(Nact[n,w])){
-    #Nact[n,w] <- 0
-     #}
-   # }
+    Nact[,w] <- hist(data[data$trawl_id == trawls[w], 8], breaks= c(x,Inf), plot = F)$count # creates densities by trawls
+    #Nact[,w] <- h.dat 
   }
   
-  return(Nact)
+return(Nact)
 }
 
- Nact_Dsole <- act.data(Dsole, Nact_hypox, x_D)  #round () if density
- Nact_Grock <- act.data(Grock, Nact_hypox, x_G)  #round () if density
- Nact_Yrock <- act.data(Yrock, Nact_hypox, x_Y) #round () if density 
- Nact_Lingcod <- act.data(Lingcod, Nact_hypox, x_L) #round (,2) if density
+# Nact_Dsole <- act.data(Dsole, Nact_hypox, x_D)  #round () if density
+# Nact_Grock <- act.data(Grock, Nact_hypox, x_G)  #round () if density
+# Nact_Yrock <- act.data(Yrock, Nact_hypox, x_Y) #round () if density 
+# Nact_Lingcod <- act.data(Lingcod, Nact_hypox, x_L) #round (,2) if density
 
 #save(Nact_Dsole, Nact_Grock, Nact_Yrock, Nact_Lingcod, Nact_hypox, file = "../Data/Hist_Spp.Rdata")
 #Nact_Grock <- act.data(Grock, Spe_present)
@@ -200,39 +193,39 @@ Grock_OR.WA <- Grock[Grock$latitude_dd >= 43.8041, ]
 Ling_OR.WA <- Lingcod[Lingcod$latitude_dd >= 43.8041, ]
 Yrock_OR.WA <- Yrock[Yrock$latitude_dd >= 43.8041, ]
 
-Nact_hypox[Nact_hypox$trawl_id ]
+#Nact_hypox[Nact_hypox$trawl_id, ]
 
-Dsole.OR.WA <- vector("list", length = 5)
+Dsole.OR.WA <- vector("list", length = 6)
 names(Dsole.OR.WA) <- unique(Dsole_OR.WA$year)
-for(d in 1:5){
+for(d in 1:length(Dsole.OR.WA)){
   yr <- as.numeric(names(Dsole.OR.WA))[d]
    Dsole.OR.WA[[d]] <- act.data(Dsole_OR.WA[Dsole_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_D)
 }
 
                      
-Grock.OR.WA <- vector("list", length = 5)
+Grock.OR.WA <- vector("list", length = 6)
 names(Grock.OR.WA) <- unique(Grock_OR.WA$year)
-for(d in 1:5){
+for(d in 1:6){
   yr <- as.numeric(names(Grock.OR.WA))[d]
    Grock.OR.WA[[d]] <- act.data(Grock_OR.WA[Grock_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_G)
 }
 
-Yrock.OR.WA <- vector("list", length = 5)
+Yrock.OR.WA <- vector("list", length = 6)
 names(Yrock.OR.WA) <- unique(Yrock_OR.WA$year)
-for(d in 1:5){
+for(d in 1:6){
   yr <- as.numeric(names(Yrock.OR.WA))[d]
   Yrock.OR.WA[[d]] <- act.data(Yrock_OR.WA[Yrock_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_Y)
 }
 
 
-Ling.OR.WA <- vector("list", length = 5)
+Ling.OR.WA <- vector("list", length = 6)
 names(Ling.OR.WA) <- unique(Ling_OR.WA$year)
-for(d in 1:5){
+for(d in 1:6){
   yr <- as.numeric(names(Ling.OR.WA))[d]
   Ling.OR.WA[[d]] <- act.data(Ling_OR.WA[Ling_OR.WA$year == yr, ], Nact_hypox[Nact_hypox$year == yr, ], x_L)
 }
 
-#save(Ling.OR.WA, Grock.OR.WA, Yrock.OR.WA, Dsole.OR.WA, file="Nact_site_yr.Rdata") 
+#save(Ling.OR.WA, Grock.OR.WA, Yrock.OR.WA, Dsole.OR.WA, Nact_DO, file="Nact_site_yr.Rdata") 
 ```
 
 
